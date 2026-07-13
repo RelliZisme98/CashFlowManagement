@@ -829,6 +829,14 @@ function App() {
                             const costMonths = Number(sub.cost_months || 1);
                             const soldMonths = Number(sub.sold_months || 1);
                             const remainingMonths = costMonths - soldMonths;
+
+                            // Tính ngày cần gia hạn / mua tiếp gói gốc (Dựa trên start_date + cost_months)
+                            let nextPurchaseDate = '';
+                            if (sub.start_date && costMonths > 0) {
+                              const d = new Date(sub.start_date);
+                              d.setMonth(d.getMonth() + costMonths);
+                              nextPurchaseDate = d.toISOString().split('T')[0];
+                            }
                             
                             // Cách tính vốn và lãi thực tế theo số tháng đã bán
                             const monthlyCost = costMonths > 0 ? (Number(sub.cost_price || 0) / costMonths) : 0;
@@ -928,7 +936,14 @@ function App() {
                                       ) : remainingMonths === 0 ? (
                                         <span className="text-muted">Vừa đủ</span>
                                       ) : (
-                                        <strong className="text-danger" title="Khách trả trước nhiều tháng hơn gói gốc hiện tại (Bạn nợ khách tháng)">Thiếu {Math.abs(remainingMonths)} thg</strong>
+                                        <>
+                                          <strong className="text-danger" title="Khách trả trước nhiều tháng hơn gói gốc hiện tại (Bạn nợ khách tháng)">Thiếu {Math.abs(remainingMonths)} thg</strong>
+                                          {nextPurchaseDate && (
+                                            <div style={{ fontSize: '11px', color: 'var(--danger)', marginTop: '4px', fontWeight: 500 }}>
+                                              Mua tiếp trước: <strong style={{ textDecoration: 'underline' }}>{nextPurchaseDate}</strong>
+                                            </div>
+                                          )}
+                                        </>
                                       )}
                                     </div>
                                   </div>
@@ -1085,8 +1100,19 @@ function App() {
                               <p title="Giá bán ra cho khách hàng">Bán: <strong>{formatVND(serv.default_sell_price)}</strong></p>
                               <p style={{ color: 'var(--success)', fontWeight: 600 }}>Lãi ước tính: +{formatVND(estimatedProfit)}</p>
                               {serv.notes && (
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic', wordBreak: 'break-word' }}>
-                                  Ghi chú: {serv.notes}
+                                <div style={{ 
+                                  fontSize: '11px', 
+                                  color: 'var(--text-muted)', 
+                                  marginTop: '8px', 
+                                  backgroundColor: 'var(--bg-app)', 
+                                  padding: '8px 10px', 
+                                  borderRadius: 'var(--radius-sm)',
+                                  borderLeft: '3px solid var(--primary)',
+                                  lineHeight: '1.4',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word'
+                                }}>
+                                  <strong>Ghi chú:</strong> {serv.notes}
                                 </div>
                               )}
                             </div>

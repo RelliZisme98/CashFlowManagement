@@ -931,9 +931,10 @@ a {
   border-radius: var(--radius-md);
   padding: 16px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   transition: var(--transition);
+  gap: 12px;
 }
 
 .service-config-card:hover {
@@ -944,8 +945,10 @@ a {
 
 .service-config-info {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .service-icon-wrapper {
@@ -957,12 +960,19 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+}
+
+.service-config-detail {
+  flex: 1;
+  min-width: 0;
 }
 
 .service-config-detail h4 {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-main);
+  word-break: break-word;
 }
 
 .service-config-detail p {
