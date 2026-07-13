@@ -1,0 +1,65 @@
+-- SCRIPT KHỞI TẠO CƠ SỞ DỮ LIỆU TRÊN SUPABASE
+-- Coppy và chạy script này trong phần SQL Editor của Supabase
+
+-- 1. Bảng cấu hình các gói dịch vụ (Dùng để hiển thị gợi ý & điền giá mặc định khi thêm mới)
+CREATE TABLE IF NOT EXISTS public.services_config (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    service_name TEXT UNIQUE NOT NULL,
+    default_cost_price NUMERIC NOT NULL DEFAULT 0,
+    default_sell_price NUMERIC NOT NULL DEFAULT 0,
+    icon_name TEXT DEFAULT 'box'
+);
+
+-- Bật Row Level Security (RLS) hoặc tắt tùy mục đích. Để đơn giản cho việc quản lý nội bộ,
+-- ta có thể tắt RLS hoặc viết rule cho phép đọc ghi tự do nếu không cần phân quyền phức tạp.
+ALTER TABLE public.services_config DISABLE ROW LEVEL SECURITY;
+
+-- Thêm dữ liệu mẫu cho các dịch vụ phổ biến
+INSERT INTO public.services_config (service_name, default_cost_price, default_sell_price, icon_name)
+VALUES 
+    ('ChatGPT Plus', 250000, 320000, 'message-square'),
+    ('CapCut Pro', 80000, 150000, 'video'),
+    ('Google One (Google AI)', 180000, 250000, 'globe'),
+    ('Grok AI', 220000, 300000, 'zap'),
+    ('Canva Pro', 30000, 80000, 'image'),
+    ('YouTube Premium', 35000, 79000, 'play')
+ON CONFLICT (service_name) DO UPDATE 
+SET 
+    default_cost_price = EXCLUDED.default_cost_price,
+    default_sell_price = EXCLUDED.default_sell_price,
+    icon_name = EXCLUDED.icon_name;
+
+-- 2. Bảng quản lý thông tin mua bán tài khoản của khách hàng
+CREATE TABLE IF NOT EXISTS public.subscriptions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT,
+    service_name TEXT NOT NULL,
+    account_email TEXT,
+    account_password TEXT,
+    cost_price NUMERIC NOT NULL DEFAULT 0,
+    sell_price NUMERIC NOT NULL DEFAULT 0,
+    start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    end_date DATE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'canceled')),
+    notes TEXT
+);
+
+ALTER TABLE public.subscriptions DISABLE ROW LEVEL SECURITY;
+
+-- Tạo index để truy vấn nhanh hơn
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON public.subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_end_date ON public.subscriptions(end_date);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_customer_name ON public.subscriptions(customer_name);
+
+-- Thêm một số bản ghi mẫu để giao diện trực quan ngay lập tức
+INSERT INTO public.subscriptions (customer_name, customer_phone, service_name, account_email, account_password, cost_price, sell_price, start_date, end_date, status, notes)
+VALUES 
+    ('Nguyễn Văn A', '0912345678', 'ChatGPT Plus', 'gpt.user1@gmail.com', 'Pass123@', 250000, 320000, CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '20 days', 'active', 'Profile số 1 - Khách quen'),
+    ('Trần Thị B', '0987654321', 'CapCut Pro', 'capcut.user2@gmail.com', 'Capcut999', 80000, 150000, CURRENT_DATE - INTERVAL '25 days', CURRENT_DATE + INTERVAL '5 days', 'active', 'Mua gói 1 tháng'),
+    ('Lê Văn C', '0905123456', 'YouTube Premium', 'yt.user3@gmail.com', 'YtPremium1', 35000, 79000, CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE - INTERVAL '1 days', 'expired', 'Gói gia hạn tự động, cần báo khách gia hạn tiếp'),
+    ('Phạm Minh D', '0933445566', 'Google One (Google AI)', 'google.user4@gmail.com', 'GoogleAI2026', 180000, 250000, CURRENT_DATE - INTERVAL '5 days', CURRENT_DATE + INTERVAL '25 days', 'active', 'Khách mua qua Zalo'),
+    ('Hoàng Anh E', '0944556677', 'Grok AI', 'grok.user5@gmail.com', 'GrokAI789', 220000, 300000, CURRENT_DATE - INTERVAL '12 days', CURRENT_DATE + INTERVAL '18 days', 'active', 'Bảo hành trọn đời theo chính sách'),
+    ('Đỗ Thanh F', '0955667788', 'Canva Pro', 'canva.user6@gmail.com', 'CanvaPro321', 30000, 80000, CURRENT_DATE - INTERVAL '15 days', CURRENT_DATE + INTERVAL '15 days', 'active', 'Khách mua dùng chung nhóm');
