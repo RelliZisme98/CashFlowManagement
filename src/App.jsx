@@ -1494,6 +1494,12 @@ function SubscriptionModalForm({ mode, data, services, onClose, onSave, formatVN
                 <textarea 
                   value={formData.notes} 
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
                   className="form-input form-textarea" 
                   placeholder="Ví dụ: Profile số 3, khách dùng chung với A B C. Hoặc backup cookie đăng nhập..."
                 />
@@ -1614,6 +1620,12 @@ function ServiceModalForm({ mode, data, onClose, onSave }) {
               <textarea 
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
                 className="form-input"
                 placeholder="Ví dụ: Giao tài khoản trong 5 phút, bảo hành trọn đời..."
                 rows={3}
