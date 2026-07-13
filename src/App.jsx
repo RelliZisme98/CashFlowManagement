@@ -1611,12 +1611,13 @@ function ServiceModalForm({ mode, data, onClose, onSave }) {
 
             <div className="form-group">
               <label className="form-label">Ghi Chú Gói Dịch Vụ</label>
-              <input 
-                type="text" 
+              <textarea 
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 className="form-input"
                 placeholder="Ví dụ: Giao tài khoản trong 5 phút, bảo hành trọn đời..."
+                rows={3}
+                style={{ resize: 'vertical', minHeight: '80px', padding: '10px 12px' }}
               />
             </div>
 
