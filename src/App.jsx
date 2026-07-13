@@ -485,8 +485,6 @@ function App() {
           {/* Trạng thái Database */}
           <div 
             className={`db-badge ${dbStatus.type}`}
-            style={{ cursor: 'pointer' }}
-            onClick={() => setActiveTab('settings')}
             title={dbStatus.type === 'supabase' ? 'Đang kết nối Supabase Cloud' : 'Đang chạy Local Storage (Lưu tại trình duyệt)'}
           >
             <Database size={14} />
@@ -535,13 +533,6 @@ function App() {
           >
             <Box size={16} />
             <span>Gói Dịch Vụ & Giá</span>
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            <Settings size={16} />
-            <span>Cấu Hình Supabase DB</span>
           </button>
         </nav>
 
@@ -1093,6 +1084,11 @@ function App() {
                               <p title="Giá gốc mua vào">Vốn: <strong>{formatVND(serv.default_cost_price)}</strong></p>
                               <p title="Giá bán ra cho khách hàng">Bán: <strong>{formatVND(serv.default_sell_price)}</strong></p>
                               <p style={{ color: 'var(--success)', fontWeight: 600 }}>Lãi ước tính: +{formatVND(estimatedProfit)}</p>
+                              {serv.notes && (
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic', wordBreak: 'break-word' }}>
+                                  Ghi chú: {serv.notes}
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -1121,172 +1117,7 @@ function App() {
               </div>
             )}
 
-            {/* 4. TAB SETTINGS (KẾT NỐI DB & HƯỚNG DẪN) */}
-            {activeTab === 'settings' && (
-              <div>
-                {/* Supabase Connection Settings */}
-                <div className="settings-section">
-                  <h3>Cấu Hình Kết Nối Supabase Cloud</h3>
-                  <p className="section-desc">
-                    Mặc định, ứng dụng lưu trữ dữ liệu tại <strong>Local Storage (Trình duyệt của bạn)</strong>. 
-                    Để dữ liệu được lưu trữ đám mây vĩnh viễn, không bị mất khi xóa lịch sử trình duyệt, hãy kết nối với Supabase DB cá nhân của bạn.
-                  </p>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: dbStatus.type === 'supabase' ? '1fr' : '1fr 1fr', gap: '24px', alignItems: 'start' }}>
-                    {/* Form Kết Nối */}
-                    <form onSubmit={handleConnectSupabase}>
-                      <div className="form-group">
-                        <label className="form-label">Supabase URL</label>
-                        <input 
-                          type="url" 
-                          placeholder="https://xxxxxx.supabase.co" 
-                          value={dbConfigUrl}
-                          onChange={(e) => setDbConfigUrl(e.target.value)}
-                          className="form-input"
-                          disabled={dbStatus.type === 'supabase'}
-                        />
-                      </div>
-                      
-                      <div className="form-group">
-                        <label className="form-label">Supabase API Key (Anon Key)</label>
-                        <input 
-                          type="password" 
-                          placeholder="eyJhbGciOi..." 
-                          value={dbConfigKey}
-                          onChange={(e) => setDbConfigKey(e.target.value)}
-                          className="form-input"
-                          disabled={dbStatus.type === 'supabase'}
-                        />
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                        {dbStatus.type === 'supabase' ? (
-                          <>
-                            <button 
-                              type="button" 
-                              className="btn btn-danger"
-                              onClick={handleDisconnectSupabase}
-                            >
-                              <Trash2 size={16} /> Ngắt Kết Nối Cloud
-                            </button>
-                            <button 
-                              type="button" 
-                              className="btn btn-secondary"
-                              onClick={handleSyncToSupabase}
-                              disabled={syncing}
-                            >
-                              <RefreshCw size={16} className={syncing ? 'spin-anim' : ''} />
-                              {syncing ? 'Đang tải lên...' : 'Đẩy Dữ Liệu Local Lên Cloud'}
-                            </button>
-                          </>
-                        ) : (
-                          <button type="submit" className="btn btn-primary">
-                            <CheckCircle size={16} /> Kết Nối Cloud DB
-                          </button>
-                        )}
-                      </div>
-                    </form>
-
-                    {/* Trạng thái hiện tại */}
-                    <div style={{ padding: '20px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-app)' }}>
-                      <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                        <Database size={16} style={{ color: dbStatus.type === 'supabase' ? 'var(--success)' : 'var(--warning)' }} />
-                        Trạng Thái Lưu Trữ Hiện Tại
-                      </h4>
-                      <p style={{ fontSize: '13px', lineHeight: '1.6' }}>
-                        Loại kết nối: <strong>{dbStatus.type === 'supabase' ? 'Supabase Database Cloud' : 'Local Storage'}</strong>
-                        <br />
-                        {dbStatus.type === 'supabase' ? (
-                          <>
-                            Địa chỉ DB: <code>{dbStatus.url}</code>
-                            <br />
-                            Nguồn cấu hình: <code>{dbStatus.source === 'env' ? '.env file' : 'UI Custom Settings'}</code>
-                            <p style={{ marginTop: '12px', color: 'var(--success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <CheckCircle size={14} /> Dữ liệu đã được lưu trữ an toàn trên máy chủ đám mây Supabase.
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            Nơi lưu: <strong>Trình duyệt cục bộ</strong>
-                            <p style={{ marginTop: '12px', color: 'var(--warning)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <AlertCircle size={14} /> Lưu ý: Dữ liệu có thể bị mất nếu bạn dọn dẹp cookie hoặc cache trình duyệt. Hãy tạo một dự án Supabase miễn phí và kết nối để an tâm sử dụng lâu dài.
-                            </p>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* SQL Schema Guide */}
-                <div className="settings-section">
-                  <h3>Hướng Dẫn Khởi Tạo Database trên Supabase</h3>
-                  <p className="section-desc">
-                    Nếu bạn tự tạo một Project Supabase mới, hãy copy đoạn mã SQL bên dưới, mở giao diện quản lý Supabase, truy cập vào menu <strong>SQL Editor</strong> &rarr; <strong>New Query</strong>, paste vào và ấn nút <strong>Run</strong> để tự động tạo các bảng và dữ liệu mẫu.
-                  </p>
-
-                  <div className="code-block-container">
-                    <button 
-                      className="copy-btn"
-                      onClick={() => copyToClipboard(`CREATE TABLE IF NOT EXISTS public.services_config (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    service_name TEXT UNIQUE NOT NULL,
-    default_cost_price NUMERIC NOT NULL DEFAULT 0,
-    default_sell_price NUMERIC NOT NULL DEFAULT 0,
-    icon_name TEXT DEFAULT 'box'
-);
-ALTER TABLE public.services_config DISABLE ROW LEVEL SECURITY;
-
-CREATE TABLE IF NOT EXISTS public.subscriptions (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    customer_name TEXT NOT NULL,
-    customer_phone TEXT,
-    service_name TEXT NOT NULL,
-    account_email TEXT,
-    account_password TEXT,
-    cost_price NUMERIC NOT NULL DEFAULT 0,
-    sell_price NUMERIC NOT NULL DEFAULT 0,
-    start_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    end_date DATE NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'canceled')),
-    notes TEXT
-);
-ALTER TABLE public.subscriptions DISABLE ROW LEVEL SECURITY;`, 'Mã SQL Schema')}
-                    >
-                      <Copy size={12} /> Sao chép SQL
-                    </button>
-                    <pre className="code-block">{`CREATE TABLE IF NOT EXISTS public.services_config (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    service_name TEXT UNIQUE NOT NULL,
-    default_cost_price NUMERIC NOT NULL DEFAULT 0,
-    default_sell_price NUMERIC NOT NULL DEFAULT 0,
-    icon_name TEXT DEFAULT 'box'
-);
-ALTER TABLE public.services_config DISABLE ROW LEVEL SECURITY;
-
-CREATE TABLE IF NOT EXISTS public.subscriptions (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    customer_name TEXT NOT NULL,
-    customer_phone TEXT,
-    service_name TEXT NOT NULL,
-    account_email TEXT,
-    account_password TEXT,
-    cost_price NUMERIC NOT NULL DEFAULT 0,
-    sell_price NUMERIC NOT NULL DEFAULT 0,
-    start_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    end_date DATE NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'canceled')),
-    notes TEXT
-);
-ALTER TABLE public.subscriptions DISABLE ROW LEVEL SECURITY;`}</pre>
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
@@ -1691,7 +1522,8 @@ function ServiceModalForm({ mode, data, onClose, onSave }) {
     service_name: '',
     default_cost_price: 0,
     default_sell_price: 0,
-    icon_name: 'box'
+    icon_name: 'box',
+    notes: ''
   });
 
   useEffect(() => {
@@ -1700,7 +1532,8 @@ function ServiceModalForm({ mode, data, onClose, onSave }) {
         service_name: data.service_name || '',
         default_cost_price: data.default_cost_price || 0,
         default_sell_price: data.default_sell_price || 0,
-        icon_name: data.icon_name || 'box'
+        icon_name: data.icon_name || 'box',
+        notes: data.notes || ''
       });
     }
   }, [data]);
@@ -1774,6 +1607,17 @@ function ServiceModalForm({ mode, data, onClose, onSave }) {
                 <option value="image">Hình ảnh / Thiết kế (Canva Pro, Midjourney...)</option>
                 <option value="box">Hộp / Khác</option>
               </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Ghi Chú Gói Dịch Vụ</label>
+              <input 
+                type="text" 
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                className="form-input"
+                placeholder="Ví dụ: Giao tài khoản trong 5 phút, bảo hành trọn đời..."
+              />
             </div>
 
           </div>

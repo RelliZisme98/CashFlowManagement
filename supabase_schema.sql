@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS public.services_config (
     service_name TEXT UNIQUE NOT NULL,
     default_cost_price NUMERIC NOT NULL DEFAULT 0,
     default_sell_price NUMERIC NOT NULL DEFAULT 0,
-    icon_name TEXT DEFAULT 'box'
+    icon_name TEXT DEFAULT 'box',
+    notes TEXT
 );
 
 -- Bật Row Level Security (RLS) hoặc tắt tùy mục đích. Để đơn giản cho việc quản lý nội bộ,
@@ -16,19 +17,20 @@ CREATE TABLE IF NOT EXISTS public.services_config (
 ALTER TABLE public.services_config DISABLE ROW LEVEL SECURITY;
 
 -- Thêm dữ liệu mẫu cho các dịch vụ phổ biến
-INSERT INTO public.services_config (service_name, default_cost_price, default_sell_price, icon_name)
+INSERT INTO public.services_config (service_name, default_cost_price, default_sell_price, icon_name, notes)
 VALUES 
-    ('ChatGPT Plus', 250000, 320000, 'message-square'),
-    ('CapCut Pro', 80000, 150000, 'video'),
-    ('Google One (Google AI)', 180000, 250000, 'globe'),
-    ('Grok AI', 220000, 300000, 'zap'),
-    ('Canva Pro', 30000, 80000, 'image'),
-    ('YouTube Premium', 35000, 79000, 'play')
+    ('ChatGPT Plus', 250000, 320000, 'message-square', 'Tài khoản OpenAI Plus chính chủ'),
+    ('CapCut Pro', 80000, 150000, 'video', 'Gói Pro edit video mượt mà'),
+    ('Google One (Google AI)', 180000, 250000, 'globe', 'Lưu trữ 2TB kèm Google Gemini Advanced'),
+    ('Grok AI', 220000, 300000, 'zap', 'Premium X Grok AI'),
+    ('Canva Pro', 30000, 80000, 'image', 'Canva thiết kế chuyên nghiệp'),
+    ('YouTube Premium', 35000, 79000, 'play', 'Không quảng cáo kèm YouTube Music')
 ON CONFLICT (service_name) DO UPDATE 
 SET 
     default_cost_price = EXCLUDED.default_cost_price,
     default_sell_price = EXCLUDED.default_sell_price,
-    icon_name = EXCLUDED.icon_name;
+    icon_name = EXCLUDED.icon_name,
+    notes = EXCLUDED.notes;
 
 -- 2. Bảng quản lý thông tin mua bán tài khoản của khách hàng
 CREATE TABLE IF NOT EXISTS public.subscriptions (

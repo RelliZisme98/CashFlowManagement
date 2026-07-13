@@ -68,12 +68,12 @@ export const getDbStatus = () => {
 
 // --- DỮ LIỆU MẪU ĐỂ KHỞI TẠO NẾU DÙNG LOCAL STORAGE ---
 const DEFAULT_SERVICES = [
-  { id: '1', service_name: 'ChatGPT Plus', default_cost_price: 250000, default_sell_price: 320000, icon_name: 'message-square' },
-  { id: '2', service_name: 'CapCut Pro', default_cost_price: 80000, default_sell_price: 150000, icon_name: 'video' },
-  { id: '3', service_name: 'Google One (Google AI)', default_cost_price: 180000, default_sell_price: 250000, icon_name: 'globe' },
-  { id: '4', service_name: 'Grok AI', default_cost_price: 220000, default_sell_price: 300000, icon_name: 'zap' },
-  { id: '5', service_name: 'Canva Pro', default_cost_price: 30000, default_sell_price: 80000, icon_name: 'image' },
-  { id: '6', service_name: 'YouTube Premium', default_cost_price: 35000, default_sell_price: 79000, icon_name: 'play' }
+  { id: '1', service_name: 'ChatGPT Plus', default_cost_price: 250000, default_sell_price: 320000, icon_name: 'message-square', notes: 'Tài khoản OpenAI Plus chính chủ' },
+  { id: '2', service_name: 'CapCut Pro', default_cost_price: 80000, default_sell_price: 150000, icon_name: 'video', notes: 'Gói Pro edit video mượt mà' },
+  { id: '3', service_name: 'Google One (Google AI)', default_cost_price: 180000, default_sell_price: 250000, icon_name: 'globe', notes: 'Lưu trữ 2TB kèm Google Gemini Advanced' },
+  { id: '4', service_name: 'Grok AI', default_cost_price: 220000, default_sell_price: 300000, icon_name: 'zap', notes: 'Premium X Grok AI' },
+  { id: '5', service_name: 'Canva Pro', default_cost_price: 30000, default_sell_price: 80000, icon_name: 'image', notes: 'Canva thiết kế chuyên nghiệp' },
+  { id: '6', service_name: 'YouTube Premium', default_cost_price: 35000, default_sell_price: 79000, icon_name: 'play', notes: 'Không quảng cáo kèm YouTube Music' }
 ];
 
 const getInitialSubscriptions = () => {
@@ -224,7 +224,8 @@ export const addServiceConfig = async (service) => {
           service_name: service.service_name,
           default_cost_price: Number(service.default_cost_price),
           default_sell_price: Number(service.default_sell_price),
-          icon_name: service.icon_name || 'box'
+          icon_name: service.icon_name || 'box',
+          notes: service.notes || ''
         }])
         .select();
       if (!error) return data[0];
@@ -240,7 +241,8 @@ export const addServiceConfig = async (service) => {
       service_name: service.service_name,
       default_cost_price: Number(service.default_cost_price),
       default_sell_price: Number(service.default_sell_price),
-      icon_name: service.icon_name || 'box'
+      icon_name: service.icon_name || 'box',
+      notes: service.notes || ''
     };
     // Check trùng tên
     if (services.some(s => s.service_name.toLowerCase() === service.service_name.toLowerCase())) {
@@ -261,7 +263,8 @@ export const updateServiceConfig = async (id, service) => {
           service_name: service.service_name,
           default_cost_price: Number(service.default_cost_price),
           default_sell_price: Number(service.default_sell_price),
-          icon_name: service.icon_name || 'box'
+          icon_name: service.icon_name || 'box',
+          notes: service.notes || ''
         })
         .eq('id', id)
         .select();
@@ -280,13 +283,14 @@ export const updateServiceConfig = async (id, service) => {
     if (services.some(s => s.id !== id && s.service_name.toLowerCase() === service.service_name.toLowerCase())) {
       throw new Error('Tên dịch vụ đã tồn tại');
     }
-
+ 
     const updated = {
       ...services[index],
       service_name: service.service_name,
       default_cost_price: Number(service.default_cost_price),
       default_sell_price: Number(service.default_sell_price),
-      icon_name: service.icon_name || 'box'
+      icon_name: service.icon_name || 'box',
+      notes: service.notes || ''
     };
     services[index] = updated;
     localStorage.setItem('local_services', JSON.stringify(services));
@@ -483,7 +487,8 @@ export const syncLocalToSupabase = async () => {
           service_name: s.service_name,
           default_cost_price: s.default_cost_price,
           default_sell_price: s.default_sell_price,
-          icon_name: s.icon_name
+          icon_name: s.icon_name,
+          notes: s.notes || ''
         }])
         .select();
       if (!error) servicesCount++;
