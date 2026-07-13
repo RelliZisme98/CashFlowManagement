@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   TrendingUp, TrendingDown, DollarSign, Users, Clock, AlertTriangle, 
-  Search, Plus, Edit, Trash2, RefreshCw, Copy, ExternalLink, Settings, 
+  Search, Plus, Edit, Trash2, RefreshCw, Copy, ExternalLink, 
   Database, Sun, Moon, Check, Box, MessageSquare, Video, Globe, Zap, 
   Image, Play, CheckCircle, Info, Calendar, Phone, Lock, Eye, EyeOff, Mail,
   Sparkles, Layers, ChevronRight, AlertCircle, HelpCircle
