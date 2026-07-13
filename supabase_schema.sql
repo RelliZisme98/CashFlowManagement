@@ -40,7 +40,10 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
     account_email TEXT,
     account_password TEXT,
     cost_price NUMERIC NOT NULL DEFAULT 0,
+    cost_months INTEGER NOT NULL DEFAULT 1,
+    sold_months INTEGER NOT NULL DEFAULT 1,
     sell_price NUMERIC NOT NULL DEFAULT 0,
+    amount_paid NUMERIC NOT NULL DEFAULT 0,
     start_date DATE NOT NULL DEFAULT CURRENT_DATE,
     end_date DATE NOT NULL,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'canceled')),
@@ -55,11 +58,11 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_end_date ON public.subscriptions(en
 CREATE INDEX IF NOT EXISTS idx_subscriptions_customer_name ON public.subscriptions(customer_name);
 
 -- Thêm một số bản ghi mẫu để giao diện trực quan ngay lập tức
-INSERT INTO public.subscriptions (customer_name, customer_phone, service_name, account_email, account_password, cost_price, sell_price, start_date, end_date, status, notes)
+INSERT INTO public.subscriptions (customer_name, customer_phone, service_name, account_email, account_password, cost_price, cost_months, sold_months, sell_price, amount_paid, start_date, end_date, status, notes)
 VALUES 
-    ('Nguyễn Văn A', '0912345678', 'ChatGPT Plus', 'gpt.user1@gmail.com', 'Pass123@', 250000, 320000, CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '20 days', 'active', 'Profile số 1 - Khách quen'),
-    ('Trần Thị B', '0987654321', 'CapCut Pro', 'capcut.user2@gmail.com', 'Capcut999', 80000, 150000, CURRENT_DATE - INTERVAL '25 days', CURRENT_DATE + INTERVAL '5 days', 'active', 'Mua gói 1 tháng'),
-    ('Lê Văn C', '0905123456', 'YouTube Premium', 'yt.user3@gmail.com', 'YtPremium1', 35000, 79000, CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE - INTERVAL '1 days', 'expired', 'Gói gia hạn tự động, cần báo khách gia hạn tiếp'),
-    ('Phạm Minh D', '0933445566', 'Google One (Google AI)', 'google.user4@gmail.com', 'GoogleAI2026', 180000, 250000, CURRENT_DATE - INTERVAL '5 days', CURRENT_DATE + INTERVAL '25 days', 'active', 'Khách mua qua Zalo'),
-    ('Hoàng Anh E', '0944556677', 'Grok AI', 'grok.user5@gmail.com', 'GrokAI789', 220000, 300000, CURRENT_DATE - INTERVAL '12 days', CURRENT_DATE + INTERVAL '18 days', 'active', 'Bảo hành trọn đời theo chính sách'),
-    ('Đỗ Thanh F', '0955667788', 'Canva Pro', 'canva.user6@gmail.com', 'CanvaPro321', 30000, 80000, CURRENT_DATE - INTERVAL '15 days', CURRENT_DATE + INTERVAL '15 days', 'active', 'Khách mua dùng chung nhóm');
+    ('Nguyễn Văn A', '0912345678', 'ChatGPT Plus', 'gpt.user1@gmail.com', 'Pass123@', 250000, 12, 1, 320000, 320000, CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '20 days', 'active', 'Gói gốc 1 năm chia nhỏ bán lẻ từng tháng'),
+    ('Trần Thị B', '0987654321', 'CapCut Pro', 'capcut.user2@gmail.com', 'Capcut999', 80000, 1, 1, 150000, 150000, CURRENT_DATE - INTERVAL '25 days', CURRENT_DATE + INTERVAL '5 days', 'active', 'Mua gói 1 tháng bán hết luôn'),
+    ('Lê Văn C', '0905123456', 'YouTube Premium', 'yt.user3@gmail.com', 'YtPremium1', 350000, 12, 12, 600000, 600000, CURRENT_DATE - INTERVAL '360 days', CURRENT_DATE - INTERVAL '1 days', 'expired', 'Đã hết hạn 1 năm bảo hành'),
+    ('Phạm Minh D', '0933445566', 'Google One (Google AI)', 'google.user4@gmail.com', 'GoogleAI2026', 180000, 6, 3, 250000, 200000, CURRENT_DATE - INTERVAL '5 days', CURRENT_DATE + INTERVAL '85 days', 'active', 'Gói gốc 6 tháng, bán cho khách 3 tháng. Khách nợ 50k'),
+    ('Hoàng Anh E', '0944556677', 'Grok AI', 'grok.user5@gmail.com', 'GrokAI789', 220000, 1, 1, 300000, 300000, CURRENT_DATE - INTERVAL '12 days', CURRENT_DATE + INTERVAL '18 days', 'active', 'Khách quen chuyển khoản đủ'),
+    ('Đỗ Thanh F', '0955667788', 'Canva Pro', 'canva.user6@gmail.com', 'CanvaPro321', 300000, 12, 6, 200000, 200000, CURRENT_DATE - INTERVAL '15 days', CURRENT_DATE + INTERVAL '165 days', 'active', 'Gói gốc Canva 1 năm, bán 6 tháng');

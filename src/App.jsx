@@ -3,7 +3,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, Users, Clock, AlertTriangle, 
   Search, Plus, Edit, Trash2, RefreshCw, Copy, ExternalLink, Settings, 
   Database, Sun, Moon, Check, Box, MessageSquare, Video, Globe, Zap, 
-  Image, Play, CheckCircle, Info, Calendar, Phone, Lock, Eye, EyeOff,
+  Image, Play, CheckCircle, Info, Calendar, Phone, Lock, Eye, EyeOff, Mail,
   Sparkles, Layers, ChevronRight, AlertCircle, HelpCircle
 } from 'lucide-react';
 import {
@@ -113,7 +113,9 @@ function App() {
   };
 
   const formatVND = (val) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+    const num = Number(val || 0);
+    if (isNaN(num)) return '0 ₫';
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
   };
 
   const copyToClipboard = (text, label) => {
@@ -137,7 +139,11 @@ function App() {
       // Bỏ qua các đơn hàng bị hủy khi tính doanh thu/lợi nhuận
       if (s.status !== 'canceled') {
         revenue += Number(s.sell_price || 0);
-        cost += Number(s.cost_price || 0);
+        
+        const costMonths = Number(s.cost_months || 1);
+        const soldMonths = Number(s.sold_months || 1);
+        const itemCost = costMonths > 0 ? (Number(s.cost_price || 0) / costMonths) * soldMonths : 0;
+        cost += itemCost;
       }
 
       // Xác định trạng thái thực tế dựa trên ngày hết hạn
@@ -207,9 +213,15 @@ function App() {
             sortKey
           };
         }
+        
+        const costMonths = Number(s.cost_months || 1);
+        const soldMonths = Number(s.sold_months || 1);
+        const itemCost = costMonths > 0 ? (Number(s.cost_price || 0) / costMonths) * soldMonths : 0;
+        const itemProfit = Number(s.sell_price || 0) - itemCost;
+
         monthlyMap[key]['Doanh thu'] += Number(s.sell_price || 0);
-        monthlyMap[key]['Vốn'] += Number(s.cost_price || 0);
-        monthlyMap[key]['Lợi nhuận'] += (Number(s.sell_price || 0) - Number(s.cost_price || 0));
+        monthlyMap[key]['Vốn'] += itemCost;
+        monthlyMap[key]['Lợi nhuận'] += itemProfit;
       });
 
     return Object.values(monthlyMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
@@ -220,7 +232,12 @@ function App() {
     const map = {};
     subscriptions.forEach(s => {
       if (s.status === 'canceled') return;
-      const profit = Number(s.sell_price || 0) - Number(s.cost_price || 0);
+      
+      const costMonths = Number(s.cost_months || 1);
+      const soldMonths = Number(s.sold_months || 1);
+      const itemCost = costMonths > 0 ? (Number(s.cost_price || 0) / costMonths) * soldMonths : 0;
+      const profit = Number(s.sell_price || 0) - itemCost;
+
       if (!map[s.service_name]) {
         map[s.service_name] = { service_name: s.service_name, revenue: 0, profit: 0, count: 0 };
       }
@@ -268,8 +285,15 @@ function App() {
 
         // Custom sort logic
         if (sortBy === 'profit') {
-          fieldA = Number(a.sell_price || 0) - Number(a.cost_price || 0);
-          fieldB = Number(b.sell_price || 0) - Number(b.cost_price || 0);
+          const costMonthsA = Number(a.cost_months || 1);
+          const soldMonthsA = Number(a.sold_months || 1);
+          const itemCostA = costMonthsA > 0 ? (Number(a.cost_price || 0) / costMonthsA) * soldMonthsA : 0;
+          fieldA = Number(a.sell_price || 0) - itemCostA;
+
+          const costMonthsB = Number(b.cost_months || 1);
+          const soldMonthsB = Number(b.sold_months || 1);
+          const itemCostB = costMonthsB > 0 ? (Number(b.cost_price || 0) / costMonthsB) * soldMonthsB : 0;
+          fieldB = Number(b.sell_price || 0) - itemCostB;
         } else if (sortBy === 'end_date') {
           fieldA = a.end_date || '';
           fieldB = b.end_date || '';
@@ -790,10 +814,10 @@ function App() {
                           <tr>
                             <th>Khách Hàng</th>
                             <th>Gói Mua</th>
-                            <th>Thông Tin Tài Khoản Bán</th>
-                            <th>Giá Gốc (Vốn)</th>
-                            <th>Giá Bán</th>
-                            <th>Lãi/Lỗ</th>
+                            <th>Thông Tin Acc</th>
+                            <th>Số Tháng (Gốc/Bán/Dư)</th>
+                            <th>Tài Chính (Vốn/Bán/Lãi)</th>
+                            <th>Thanh Toán</th>
                             <th>Thời Hạn Bảo Hành</th>
                             <th style={{ width: '120px' }}>Hành Động</th>
                           </tr>
@@ -801,8 +825,22 @@ function App() {
                         <tbody>
                           {processedSubscriptions.map(sub => {
                             const warranty = getWarrantyStatus(sub.end_date);
-                            const profit = Number(sub.sell_price || 0) - Number(sub.cost_price || 0);
-                            const serviceIcon = services.find(s => s.service_name === sub.service_name)?.icon_name || 'box';
+                            
+                            // Các thông số tháng
+                            const costMonths = Number(sub.cost_months || 1);
+                            const soldMonths = Number(sub.sold_months || 1);
+                            const remainingMonths = costMonths - soldMonths;
+                            
+                            // Cách tính vốn và lãi thực tế theo số tháng đã bán
+                            const monthlyCost = costMonths > 0 ? (Number(sub.cost_price || 0) / costMonths) : 0;
+                            const matchingCost = monthlyCost * soldMonths;
+                            const profit = Number(sub.sell_price || 0) - matchingCost;
+                            
+                            // Thanh toán & công nợ
+                            const amountPaid = Number(sub.amount_paid || 0);
+                            const balance = Number(sub.sell_price || 0) - amountPaid;
+                            
+                            const serviceIcon = (services || []).find(s => s.service_name === sub.service_name)?.icon_name || 'box';
                             
                             // Check xem tài khoản thực tế có bị hết hạn hay không
                             const isReallyExpired = sub.status === 'expired' || warranty.days < 0;
@@ -874,27 +912,54 @@ function App() {
 
                                     {sub.notes && (
                                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
-                                        Lưu ý: {sub.notes}
+                                        Ghi chú: {sub.notes}
                                       </div>
                                     )}
                                   </div>
                                 </td>
 
-                                {/* 4. Giá Gốc */}
+                                {/* 4. Số Tháng */}
                                 <td>
-                                  <span className="price-text">{formatVND(sub.cost_price)}</span>
+                                  <div className="months-cell">
+                                    <div>Gói gốc: <strong>{costMonths}</strong> thg</div>
+                                    <div>Đã bán: <strong>{soldMonths}</strong> thg</div>
+                                    <div>
+                                      Còn dư: {remainingMonths > 0 ? (
+                                        <strong className="text-success">{remainingMonths} thg</strong>
+                                      ) : remainingMonths === 0 ? (
+                                        <span className="text-muted">Vừa đủ</span>
+                                      ) : (
+                                        <strong className="text-danger" title="Khách trả trước nhiều tháng hơn gói gốc hiện tại (Bạn nợ khách tháng)">Thiếu {Math.abs(remainingMonths)} thg</strong>
+                                      )}
+                                    </div>
+                                  </div>
                                 </td>
 
-                                {/* 5. Giá Bán */}
+                                {/* 5. Tài Chính */}
                                 <td>
-                                  <span className="price-text" style={{ fontWeight: 600 }}>{formatVND(sub.sell_price)}</span>
+                                  <div className="finance-cell">
+                                    <div style={{ fontSize: '12px' }}>Gốc (Gói): <span className="price-text">{formatVND(sub.cost_price)}</span></div>
+                                    <div style={{ fontSize: '12px' }}>Bán ra: <span className="price-text" style={{ fontWeight: 600 }}>{formatVND(sub.sell_price)}</span></div>
+                                    <div style={{ fontSize: '12px', fontWeight: 500 }}>
+                                      Lãi/Lỗ: <span className={`price-profit ${profit >= 0 ? 'plus' : 'minus'}`}>
+                                        {profit >= 0 ? '+' : ''}{formatVND(profit)}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </td>
 
-                                {/* 6. Lãi / Lỗ */}
+                                {/* 6. Thanh Toán */}
                                 <td>
-                                  <span className={`price-profit ${profit >= 0 ? 'plus' : 'minus'}`}>
-                                    {profit >= 0 ? '+' : ''}{formatVND(profit)}
-                                  </span>
+                                  <div className="payment-cell">
+                                    <div>Đã trả: <strong className="text-success">{formatVND(amountPaid)}</strong></div>
+                                    {balance > 0 ? (
+                                      <div style={{ fontSize: '11px', color: 'var(--danger)', marginTop: '2px' }}>
+                                        Còn nợ: <strong>{formatVND(balance)}</strong>
+                                      </div>
+                                    ) : (
+                                      <span className="badge success-badge" style={{ marginTop: '4px', display: 'inline-block', padding: '2px 6px', fontSize: '10px' }}>Đã thu đủ</span>
+                                    )}
+                                  </div>
                                 </td>
 
                                 {/* 7. Bảo Hành */}
@@ -961,7 +1026,14 @@ function App() {
                       <span>Hiển thị <strong>{processedSubscriptions.length}</strong> / <strong>{subscriptions.length}</strong> khách hàng</span>
                       <span>
                         Tổng lãi nhóm lọc: <strong style={{ color: 'var(--success)' }}>
-                          {formatVND(processedSubscriptions.reduce((acc, sub) => acc + (sub.status !== 'canceled' ? (Number(sub.sell_price || 0) - Number(sub.cost_price || 0)) : 0), 0))}
+                          {formatVND(processedSubscriptions.reduce((acc, sub) => {
+                            if (sub.status === 'canceled') return acc;
+                            const costMonths = Number(sub.cost_months || 1);
+                            const soldMonths = Number(sub.sold_months || 1);
+                            const itemCost = costMonths > 0 ? (Number(sub.cost_price || 0) / costMonths) * soldMonths : 0;
+                            const itemProfit = Number(sub.sell_price || 0) - itemCost;
+                            return acc + itemProfit;
+                          }, 0))}
                         </strong>
                       </span>
                     </div>
@@ -1262,7 +1334,10 @@ function SubscriptionModalForm({ mode, data, services, onClose, onSave, formatVN
     account_email: '',
     account_password: '',
     cost_price: 0,
+    cost_months: 1,
+    sold_months: 1,
     sell_price: 0,
+    amount_paid: 0,
     start_date: new Date().toISOString().split('T')[0],
     end_date: '',
     status: 'active',
@@ -1279,7 +1354,10 @@ function SubscriptionModalForm({ mode, data, services, onClose, onSave, formatVN
         account_email: data.account_email || '',
         account_password: data.account_password || '',
         cost_price: data.cost_price || 0,
+        cost_months: data.cost_months || 1,
+        sold_months: data.sold_months || 1,
         sell_price: data.sell_price || 0,
+        amount_paid: data.amount_paid !== undefined ? data.amount_paid : (data.sell_price || 0),
         start_date: data.start_date || new Date().toISOString().split('T')[0],
         end_date: data.end_date || '',
         status: data.status || 'active',
@@ -1308,11 +1386,17 @@ function SubscriptionModalForm({ mode, data, services, onClose, onSave, formatVN
     edDate.setDate(stDate.getDate() + 30);
     const calculatedEndDate = edDate.toISOString().split('T')[0];
 
+    const defaultCost = template ? template.default_cost_price : 0;
+    const defaultSell = template ? template.default_sell_price : 0;
+
     setFormData(prev => ({
       ...prev,
       service_name: serviceName,
-      cost_price: template ? template.default_cost_price : prev.cost_price,
-      sell_price: template ? template.default_sell_price : prev.sell_price,
+      cost_price: defaultCost,
+      cost_months: 1,
+      sold_months: 1,
+      sell_price: defaultSell,
+      amount_paid: defaultSell,
       end_date: prev.end_date || calculatedEndDate
     }));
   };
@@ -1337,7 +1421,11 @@ function SubscriptionModalForm({ mode, data, services, onClose, onSave, formatVN
     onSave(formData);
   };
 
-  const estimatedProfit = formData.sell_price - formData.cost_price;
+  const costMonths = Number(formData.cost_months || 1);
+  const soldMonths = Number(formData.sold_months || 1);
+  const monthlyCost = costMonths > 0 ? (Number(formData.cost_price || 0) / costMonths) : 0;
+  const matchingCost = monthlyCost * soldMonths;
+  const estimatedProfit = formData.sell_price - matchingCost;
 
   return (
     <div className="modal-overlay">
@@ -1429,7 +1517,7 @@ function SubscriptionModalForm({ mode, data, services, onClose, onSave, formatVN
 
               {/* Giá gốc mua vào */}
               <div className="form-group">
-                <label className="form-label">Giá Gốc (Tiền Vốn) (VND) *</label>
+                <label className="form-label">Giá Gốc (Tổng Vốn Gói Gốc) (VND) *</label>
                 <input 
                   type="number" 
                   value={formData.cost_price} 
@@ -1439,13 +1527,66 @@ function SubscriptionModalForm({ mode, data, services, onClose, onSave, formatVN
                 />
               </div>
 
+              {/* Số tháng mua gốc */}
+              <div className="form-group">
+                <label className="form-label">Số Tháng Mua Gói Gốc *</label>
+                <input 
+                  type="number" 
+                  value={formData.cost_months} 
+                  onChange={(e) => setFormData(prev => ({ ...prev, cost_months: Math.max(1, Number(e.target.value)) }))}
+                  className="form-input" 
+                  required
+                  min="1"
+                />
+              </div>
+
               {/* Giá bán cho khách */}
               <div className="form-group">
                 <label className="form-label">Giá Bán Cho Khách (VND) *</label>
                 <input 
                   type="number" 
                   value={formData.sell_price} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, sell_price: Number(e.target.value) }))}
+                  onChange={(e) => {
+                    const newSell = Number(e.target.value);
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      sell_price: newSell,
+                      amount_paid: prev.amount_paid === prev.sell_price ? newSell : prev.amount_paid 
+                    }));
+                  }}
+                  className="form-input" 
+                  required
+                />
+              </div>
+
+              {/* Số tháng bán cho khách */}
+              <div className="form-group">
+                <label className="form-label">Số Tháng Đã Bán *</label>
+                <input 
+                  type="number" 
+                  value={formData.sold_months} 
+                  onChange={(e) => setFormData(prev => ({ ...prev, sold_months: Math.max(1, Number(e.target.value)) }))}
+                  className="form-input" 
+                  required
+                  min="1"
+                />
+              </div>
+
+              {/* Đã thanh toán */}
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                  Khách Đã Trả (VND) *
+                  <span 
+                    style={{ fontSize: '11px', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
+                    onClick={() => setFormData(prev => ({ ...prev, amount_paid: prev.sell_price }))}
+                  >
+                    [Thu Đủ]
+                  </span>
+                </label>
+                <input 
+                  type="number" 
+                  value={formData.amount_paid} 
+                  onChange={(e) => setFormData(prev => ({ ...prev, amount_paid: Number(e.target.value) }))}
                   className="form-input" 
                   required
                 />
