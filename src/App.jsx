@@ -69,6 +69,14 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, []);
 
+  useEffect(() => {
+    // Tự động điền cấu hình URL/Key hiện tại lên UI
+    const url = localStorage.getItem('supabase_url') || import.meta.env.VITE_SUPABASE_URL || '';
+    const key = localStorage.getItem('supabase_anon_key') || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+    setDbConfigUrl(url);
+    setDbConfigKey(key);
+  }, [dbStatus]);
+
   // Thay đổi theme
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
