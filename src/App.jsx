@@ -15,6 +15,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   AreaChart, Area
 } from 'recharts';
+// --- GROUPING HELPER ---
+const getServiceGroup = (name) => {
+  if (!name) return 'Dịch vụ khác';
+  const lower = name.toLowerCase();
+  if (lower.includes('grok')) return 'Grok AI';
+  if (lower.includes('youtube')) return 'YouTube';
+  if (lower.includes('capcut')) return 'CapCut';
+  if (lower.includes('chatgpt') || lower.includes('openai') || lower.includes('gpt')) return 'ChatGPT';
+  if (lower.includes('google')) return 'Google One / Gemini';
+  if (lower.includes('canva')) return 'Canva';
+  return 'Dịch vụ khác';
+};
 
 function App() {
   // --- STATE ---
@@ -35,6 +47,9 @@ function App() {
   // Modals state
   const [subModal, setSubModal] = useState({ isOpen: false, mode: 'add', data: null });
   const [serviceModal, setServiceModal] = useState({ isOpen: false, mode: 'add', data: null });
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkInputText, setBulkInputText] = useState('');
+  const [parsedServices, setParsedServices] = useState([]);
   const [dbConfigUrl, setDbConfigUrl] = useState('');
   const [dbConfigKey, setDbConfigKey] = useState('');
   const [syncing, setSyncing] = useState(false);
@@ -309,12 +324,28 @@ function App() {
           fieldA = a.customer_name?.toLowerCase() || '';
           fieldB = b.customer_name?.toLowerCase() || '';
         }
-
         if (fieldA < fieldB) return sortOrder === 'asc' ? -1 : 1;
         if (fieldA > fieldB) return sortOrder === 'asc' ? 1 : -1;
         return 0;
       });
   }, [subscriptions, searchQuery, filterService, filterStatus, sortBy, sortOrder]);
+
+  const groupedServices = useMemo(() => {
+    const groups = {};
+    services.forEach(serv => {
+      const group = getServiceGroup(serv.service_name);
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(serv);
+    });
+    return Object.keys(groups).sort((a, b) => {
+      if (a === 'Dịch vụ khác') return 1;
+      if (b === 'Dịch vụ khác') return -1;
+      return a.localeCompare(b);
+    }).reduce((acc, key) => {
+      acc[key] = groups[key];
+      return acc;
+    }, {});
+  }, [services]);
 
   // --- ACTIONS ---
   
@@ -407,6 +438,103 @@ function App() {
         showToast('Lỗi khi xóa!', 'danger');
       }
     }
+  };
+
+  // Nhập hàng loạt dịch vụ mẫu (Bulk import services)
+  const handleParseBulk = () => {
+    if (!bulkInputText.trim()) {
+      showToast('Vui lòng dán danh sách dịch vụ!', 'warning');
+      return;
+    }
+    const lines = bulkInputText.split('\n');
+    const items = [];
+    let currentItem = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const hasPriceKeywords = line.toLowerCase().includes('giá') || line.includes('đ/') || line.includes('💵');
+      
+      if (!hasPriceKeywords) {
+        let cleanName = line.replace(/^[✅⚠️\-\*\s\•\d\.\)]+/, '').trim();
+        if (cleanName) {
+          if (currentItem) {
+            items.push(currentItem);
+          }
+          
+          const lowerName = cleanName.toLowerCase();
+          let icon = 'box';
+          if (lowerName.includes('grok')) icon = 'zap';
+          else if (lowerName.includes('youtube')) icon = 'play';
+          else if (lowerName.includes('capcut')) icon = 'video';
+          else if (lowerName.includes('chatgpt') || lowerName.includes('openai') || lowerName.includes('gpt')) icon = 'message-square';
+          else if (lowerName.includes('google')) icon = 'globe';
+          else if (lowerName.includes('canva')) icon = 'image';
+
+          currentItem = {
+            service_name: cleanName,
+            default_cost_price: 0,
+            default_sell_price: 0,
+            icon_name: icon,
+            notes: '',
+            checked: true
+          };
+        }
+      } else {
+        const priceMatch = line.replace(/[^\d]/g, '');
+        if (priceMatch && currentItem) {
+          currentItem.default_sell_price = Number(priceMatch);
+          items.push(currentItem);
+          currentItem = null;
+        }
+      }
+    }
+    
+    if (currentItem) {
+      items.push(currentItem);
+    }
+
+    if (items.length === 0) {
+      showToast('Không thể phân tích dữ liệu. Vui lòng kiểm tra lại định dạng!', 'warning');
+    } else {
+      setParsedServices(items);
+      showToast(`Đã tìm thấy ${items.length} dịch vụ! Hãy kiểm tra và chỉnh sửa trước khi lưu.`);
+    }
+  };
+
+  const handleSaveBulkImport = async () => {
+    const toSave = parsedServices.filter(s => s.checked && s.service_name);
+    if (toSave.length === 0) {
+      showToast('Vui lòng chọn ít nhất một dịch vụ hợp lệ để lưu!', 'warning');
+      return;
+    }
+
+    let successCount = 0;
+    showToast('Đang lưu các dịch vụ...', 'info');
+    
+    const newServicesList = [...services];
+    for (const item of toSave) {
+      try {
+        const newServ = await addServiceConfig({
+          service_name: item.service_name,
+          default_cost_price: Number(item.default_cost_price || 0),
+          default_sell_price: Number(item.default_sell_price || 0),
+          icon_name: item.icon_name || 'box',
+          notes: item.notes || ''
+        });
+        newServicesList.push(newServ);
+        successCount++;
+      } catch (err) {
+        console.error('Lỗi khi lưu gói:', item.service_name, err);
+      }
+    }
+
+    setServices(newServicesList);
+    setIsBulkImportOpen(false);
+    setBulkInputText('');
+    setParsedServices([]);
+    showToast(`Đã thêm thành công ${successCount}/${toSave.length} gói dịch vụ!`);
   };
 
   // Quản lý kết nối Supabase
@@ -750,8 +878,12 @@ function App() {
                       className="select-filter"
                     >
                       <option value="all">Tất cả gói dịch vụ</option>
-                      {services.map(s => (
-                        <option key={s.id} value={s.service_name}>{s.service_name}</option>
+                      {Object.entries(groupedServices).map(([groupName, groupList]) => (
+                        <optgroup key={groupName} label={groupName}>
+                          {groupList.map(s => (
+                            <option key={s.id} value={s.service_name}>{s.service_name}</option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
 
@@ -1066,13 +1198,22 @@ function App() {
                       Tạo các mẫu dịch vụ (ví dụ: CapCut, ChatGPT Plus) để tự động hóa việc tính giá gốc, giá bán khi thêm khách hàng.
                     </p>
                   </div>
-                  <button 
-                    className="btn btn-primary"
-                    onClick={() => setServiceModal({ isOpen: true, mode: 'add', data: null })}
-                  >
-                    <Plus size={16} />
-                    <span>Thêm Gói Mới</span>
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => setIsBulkImportOpen(true)}
+                    >
+                      <Sparkles size={16} />
+                      <span>Nhập Nhanh Nhiều Gói</span>
+                    </button>
+                    <button 
+                      className="btn btn-primary"
+                      onClick={() => setServiceModal({ isOpen: true, mode: 'add', data: null })}
+                    >
+                      <Plus size={16} />
+                      <span>Thêm Gói Mới</span>
+                    </button>
+                  </div>
                 </div>
 
                 {services.length === 0 ? (
@@ -1085,59 +1226,80 @@ function App() {
                     </button>
                   </div>
                 ) : (
-                  <div className="services-list-grid">
-                    {services.map(serv => {
-                      const estimatedProfit = serv.default_sell_price - serv.default_cost_price;
-                      return (
-                        <div key={serv.id} className="service-config-card">
-                          <div className="service-config-info">
-                            <div className="service-icon-wrapper">
-                              {getServiceIcon(serv.icon_name)}
-                            </div>
-                            <div className="service-config-detail">
-                              <h4>{serv.service_name}</h4>
-                              <p title="Giá gốc mua vào">Vốn: <strong>{formatVND(serv.default_cost_price)}</strong></p>
-                              <p title="Giá bán ra cho khách hàng">Bán: <strong>{formatVND(serv.default_sell_price)}</strong></p>
-                              <p style={{ color: 'var(--success)', fontWeight: 600 }}>Lãi ước tính: +{formatVND(estimatedProfit)}</p>
-                              {serv.notes && (
-                                <div style={{ 
-                                  fontSize: '11px', 
-                                  color: 'var(--text-muted)', 
-                                  marginTop: '8px', 
-                                  backgroundColor: 'var(--bg-app)', 
-                                  padding: '8px 10px', 
-                                  borderRadius: 'var(--radius-sm)',
-                                  borderLeft: '3px solid var(--primary)',
-                                  lineHeight: '1.4',
-                                  whiteSpace: 'pre-wrap',
-                                  wordBreak: 'break-word'
-                                }}>
-                                  <strong>Ghi chú:</strong> {serv.notes}
+                  <div>
+                    {Object.entries(groupedServices).map(([groupName, groupList]) => (
+                      <div key={groupName} className="service-group-container" style={{ marginBottom: '32px' }}>
+                        <h3 style={{ 
+                          fontSize: '15px', 
+                          fontWeight: 700, 
+                          color: 'var(--text-main)', 
+                          margin: '24px 0 12px 0', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px',
+                          borderBottom: '1px solid var(--border)',
+                          paddingBottom: '8px'
+                        }}>
+                          <span style={{ width: '4px', height: '14px', backgroundColor: 'var(--primary)', borderRadius: '2px' }}></span>
+                          {groupName} ({groupList.length})
+                        </h3>
+                        
+                        <div className="services-list-grid" style={{ marginTop: '12px' }}>
+                          {groupList.map(serv => {
+                            const estimatedProfit = serv.default_sell_price - serv.default_cost_price;
+                            return (
+                              <div key={serv.id} className="service-config-card">
+                                <div className="service-config-info">
+                                  <div className="service-icon-wrapper">
+                                    {getServiceIcon(serv.icon_name)}
+                                  </div>
+                                  <div className="service-config-detail">
+                                    <h4>{serv.service_name}</h4>
+                                    <p title="Giá gốc mua vào">Vốn: <strong>{formatVND(serv.default_cost_price)}</strong></p>
+                                    <p title="Giá bán ra cho khách hàng">Bán: <strong>{formatVND(serv.default_sell_price)}</strong></p>
+                                    <p style={{ color: 'var(--success)', fontWeight: 600 }}>Lãi ước tính: +{formatVND(estimatedProfit)}</p>
+                                    {serv.notes && (
+                                      <div style={{ 
+                                        fontSize: '11px', 
+                                        color: 'var(--text-muted)', 
+                                        marginTop: '8px', 
+                                        backgroundColor: 'var(--bg-app)', 
+                                        padding: '8px 10px', 
+                                        borderRadius: 'var(--radius-sm)',
+                                        borderLeft: '3px solid var(--primary)',
+                                        lineHeight: '1.4',
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word'
+                                      }}>
+                                        <strong>Ghi chú:</strong> {serv.notes}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <button 
-                              className="icon-btn"
-                              onClick={() => setServiceModal({ isOpen: true, mode: 'edit', data: serv })}
-                              title="Chỉnh sửa dịch vụ"
-                            >
-                              <Edit size={12} />
-                            </button>
-                            <button 
-                              className="icon-btn"
-                              onClick={() => handleDeleteService(serv.id)}
-                              title="Xóa dịch vụ"
-                              style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)' }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <button 
+                                    className="icon-btn"
+                                    onClick={() => setServiceModal({ isOpen: true, mode: 'edit', data: serv })}
+                                    title="Chỉnh sửa dịch vụ"
+                                  >
+                                    <Edit size={12} />
+                                  </button>
+                                  <button 
+                                    className="icon-btn"
+                                    onClick={() => handleDeleteService(serv.id)}
+                                    title="Xóa dịch vụ"
+                                    style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)' }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1183,6 +1345,188 @@ function App() {
           onClose={() => setServiceModal({ isOpen: false, mode: 'add', data: null })}
           onSave={handleSaveService}
         />
+      )}
+
+      {/* 3. Modal Nhập Nhanh Nhiều Gói */}
+      {isBulkImportOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '800px', width: '95%' }}>
+            <div className="modal-header">
+              <h3>Nhập Nhanh Nhiều Gói Dịch Vụ</h3>
+              <button 
+                className="icon-btn" 
+                onClick={() => {
+                  setIsBulkImportOpen(false);
+                  setBulkInputText('');
+                  setParsedServices([]);
+                }} 
+                style={{ border: 'none', fontSize: '18px' }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Dán danh sách sản phẩm & giá từ nhà cung cấp:</label>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  Hệ thống tự động phát hiện tên gói dịch vụ và giá bán từ đoạn văn bản bạn dán vào.
+                </p>
+                <textarea
+                  value={bulkInputText}
+                  onChange={(e) => setBulkInputText(e.target.value)}
+                  className="form-input"
+                  style={{ minHeight: '150px', fontFamily: 'monospace', fontSize: '12px', padding: '12px' }}
+                  placeholder="Ví dụ:&#13;✅ Grok Super 1 Năm - BHF&#13;   💵 Giá: 597.999đ/tài khoản&#13;&#13;✅ Grok Super 1 Năm - KBH&#13;   💵 Giá: 97.999đ/tài khoản"
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                <button type="button" className="btn btn-secondary" onClick={handleParseBulk}>
+                  <Sparkles size={14} style={{ marginRight: '6px' }} />
+                  Phân Tích Dữ Liệu
+                </button>
+              </div>
+
+              {parsedServices.length > 0 && (
+                <div>
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>
+                    Kết quả phân tích ({parsedServices.length} gói):
+                  </label>
+                  <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                    <table className="data-table" style={{ margin: 0, minWidth: '700px' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: '40px', textAlign: 'center' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={parsedServices.every(s => s.checked)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setParsedServices(prev => prev.map(s => ({ ...s, checked })));
+                              }}
+                            />
+                          </th>
+                          <th>Tên Gói Dịch Vụ</th>
+                          <th style={{ width: '120px' }}>Giá Vốn (VND)</th>
+                          <th style={{ width: '120px' }}>Giá Bán (VND)</th>
+                          <th style={{ width: '140px' }}>Biểu Tượng</th>
+                          <th>Ghi Chú</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsedServices.map((item, idx) => (
+                          <tr key={idx} style={{ opacity: item.checked ? 1 : 0.5 }}>
+                            <td style={{ textAlign: 'center' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={item.checked}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setParsedServices(prev => prev.map((s, i) => i === idx ? { ...s, checked } : s));
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <input 
+                                type="text" 
+                                value={item.service_name}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setParsedServices(prev => prev.map((s, i) => i === idx ? { ...s, service_name: val } : s));
+                                }}
+                                className="form-input"
+                                style={{ padding: '4px 8px', fontSize: '12px' }}
+                              />
+                            </td>
+                            <td>
+                              <input 
+                                type="number" 
+                                value={item.default_cost_price}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setParsedServices(prev => prev.map((s, i) => i === idx ? { ...s, default_cost_price: val } : s));
+                                }}
+                                className="form-input"
+                                style={{ padding: '4px 8px', fontSize: '12px' }}
+                              />
+                            </td>
+                            <td>
+                              <input 
+                                type="number" 
+                                value={item.default_sell_price}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setParsedServices(prev => prev.map((s, i) => i === idx ? { ...s, default_sell_price: val } : s));
+                                }}
+                                className="form-input"
+                                style={{ padding: '4px 8px', fontSize: '12px' }}
+                              />
+                            </td>
+                            <td>
+                              <select 
+                                value={item.icon_name}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setParsedServices(prev => prev.map((s, i) => i === idx ? { ...s, icon_name: val } : s));
+                                }}
+                                className="form-input"
+                                style={{ padding: '4px 8px', fontSize: '12px' }}
+                              >
+                                <option value="zap">Sấm sét (Grok AI...)</option>
+                                <option value="play">Xem (Youtube...)</option>
+                                <option value="video">Video (CapCut...)</option>
+                                <option value="message-square">Chat (ChatGPT...)</option>
+                                <option value="globe">Web (Google...)</option>
+                                <option value="image">Ảnh (Canva...)</option>
+                                <option value="box">Hộp / Khác</option>
+                              </select>
+                            </td>
+                            <td>
+                              <input 
+                                type="text" 
+                                value={item.notes}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setParsedServices(prev => prev.map((s, i) => i === idx ? { ...s, notes: val } : s));
+                                }}
+                                className="form-input"
+                                placeholder="Ghi chú gói..."
+                                style={{ padding: '4px 8px', fontSize: '12px' }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setIsBulkImportOpen(false);
+                  setBulkInputText('');
+                  setParsedServices([]);
+                }}
+              >
+                Hủy Bỏ
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={handleSaveBulkImport}
+                disabled={parsedServices.filter(s => s.checked).length === 0}
+              >
+                Lưu {parsedServices.filter(s => s.checked).length} Gói Dịch Vụ
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1235,6 +1579,23 @@ function SubscriptionModalForm({ mode, data, services, onClose, onSave, formatVN
       }
     }
   }, [data, services]);
+
+  const groupedServices = useMemo(() => {
+    const groups = {};
+    services.forEach(s => {
+      const group = getServiceGroup(s.service_name);
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(s);
+    });
+    return Object.keys(groups).sort((a, b) => {
+      if (a === 'Dịch vụ khác') return 1;
+      if (b === 'Dịch vụ khác') return -1;
+      return a.localeCompare(b);
+    }).reduce((acc, key) => {
+      acc[key] = groups[key];
+      return acc;
+    }, {});
+  }, [services]);
 
   // Khi người dùng chọn dịch vụ mẫu: tự động điền giá vốn và giá bán
   const handleServiceChange = (e) => {
@@ -1346,8 +1707,12 @@ function SubscriptionModalForm({ mode, data, services, onClose, onSave, formatVN
                   disabled={mode === 'renew'}
                 >
                   <option value="" disabled>-- Chọn gói dịch vụ --</option>
-                  {services.map(s => (
-                    <option key={s.id} value={s.service_name}>{s.service_name}</option>
+                  {Object.entries(groupedServices).map(([groupName, groupList]) => (
+                    <optgroup key={groupName} label={groupName}>
+                      {groupList.map(s => (
+                        <option key={s.id} value={s.service_name}>{s.service_name}</option>
+                      ))}
+                    </optgroup>
                   ))}
                   {/* Tránh lỗi nếu dịch vụ bị xóa nhưng khách cũ vẫn dùng */}
                   {formData.service_name && !services.some(s => s.service_name === formData.service_name) && (
