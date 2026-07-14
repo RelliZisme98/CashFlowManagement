@@ -1778,7 +1778,7 @@ function App() {
               </div>
             )}
 
-            {/* TAB DATABASE CONFIG (KẾT NỐI SUPABASE) */}
+            {/* TAB DATABASE CONFIG (KẾT NỐI SUPABASE)
             <div className="chart-card" style={{ marginTop: '48px', borderStyle: 'dashed' }}>
               <div className="card-title-section">
                 <h3>Cấu Hình Độc Lập Cloud Supabase</h3>
@@ -1837,6 +1837,7 @@ function App() {
                 </div>
               )}
             </div>
+            */}
           </>
         )}
       </div>
