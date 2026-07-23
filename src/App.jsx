@@ -175,10 +175,7 @@ function App() {
       if (s.status !== 'canceled') {
         revenue += Number(s.sell_price || 0);
         
-        const costMonths = Number(s.cost_months || 1);
-        const soldMonths = Number(s.sold_months || 1);
-        const itemCost = costMonths > 0 ? (Number(s.cost_price || 0) / costMonths) * soldMonths : 0;
-        cost += itemCost;
+        cost += Number(s.cost_price || 0);
 
         if (s.collaborator_id) {
           const comm = Number(s.commission_amount || 0);
@@ -893,7 +890,7 @@ function App() {
                       </div>
                     </div>
                     <div className="stat-value">{formatVND(metrics.totalCost)}</div>
-                    <div className="stat-footer">Chi phí mua gốc phân bổ</div>
+                    <div className="stat-footer">Tổng chi phí mua gốc</div>
                   </div>
 
                   <div className="stat-card warning" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('collaborators')}>
@@ -1204,11 +1201,9 @@ function App() {
                               nextPurchaseDate = d.toISOString().split('T')[0];
                             }
                             
-                            // Cách tính vốn, hoa hồng và lãi thực tế theo số tháng đã bán
-                            const monthlyCost = costMonths > 0 ? (Number(sub.cost_price || 0) / costMonths) : 0;
-                            const matchingCost = monthlyCost * soldMonths;
+                            const costPrice = Number(sub.cost_price || 0);
                             const commAmount = sub.collaborator_id ? Number(sub.commission_amount || 0) : 0;
-                            const netProfit = Number(sub.sell_price || 0) - matchingCost - commAmount;
+                            const netProfit = Number(sub.sell_price || 0) - costPrice - commAmount;
                             
                             // Thanh toán khách hàng & công nợ
                             const amountPaid = Number(sub.amount_paid || 0);
@@ -1325,7 +1320,7 @@ function App() {
                                 {/* 5. Tài Chính */}
                                 <td>
                                   <div className="finance-cell">
-                                    <div style={{ fontSize: '11px' }}>Phân bổ vốn: <span className="price-text">{formatVND(matchingCost)}</span></div>
+                                    <div style={{ fontSize: '11px' }}>Vốn gốc: <span className="price-text">{formatVND(costPrice)}</span></div>
                                     <div style={{ fontSize: '11px' }}>Giá bán ra: <span className="price-text" style={{ fontWeight: 600 }}>{formatVND(sub.sell_price)}</span></div>
                                     {sub.collaborator_id && (
                                       <div style={{ fontSize: '11px' }}>Hoa hồng: <span className="price-text" style={{ color: 'var(--warning)' }}>-{formatVND(sub.commission_amount)}</span></div>
@@ -2225,12 +2220,9 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
     onSave(formData);
   };
 
-  const costMonths = Number(formData.cost_months || 1);
-  const soldMonths = Number(formData.sold_months || 1);
-  const monthlyCost = costMonths > 0 ? (Number(formData.cost_price || 0) / costMonths) : 0;
-  const matchingCost = monthlyCost * soldMonths;
+  const costPrice = Number(formData.cost_price || 0);
   const commAmount = formData.collaborator_id ? Number(formData.commission_amount || 0) : 0;
-  const estimatedProfit = formData.sell_price - matchingCost - commAmount;
+  const estimatedProfit = formData.sell_price - costPrice - commAmount;
 
   return (
     <div className="modal-overlay">
@@ -2384,7 +2376,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                 <input 
                   type="number" 
                   value={formData.cost_months} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, cost_months: Math.max(1, Number(e.target.value)) }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, cost_months: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) }))}
                   className="form-input" 
                   required
                   min="1"
@@ -2416,7 +2408,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                 <input 
                   type="number" 
                   value={formData.sold_months} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, sold_months: Math.max(1, Number(e.target.value)) }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sold_months: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) }))}
                   className="form-input" 
                   required
                   min="1"
@@ -2498,7 +2490,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                 <span style={{ fontSize: '16px', fontWeight: 800, color: estimatedProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                   {formatVND(estimatedProfit)}
                 </span>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(Giá bán - Phân bổ vốn - Hoa hồng CTV)</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(Giá bán - Giá vốn - Hoa hồng CTV)</span>
               </div>
 
               {/* Ghi chú */}
