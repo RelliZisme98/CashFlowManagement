@@ -1983,7 +1983,7 @@ function App() {
                                 type="number" 
                                 value={item.default_cost_price}
                                 onChange={(e) => {
-                                  const val = Number(e.target.value);
+                                  const val = e.target.value;
                                   setParsedServices(prev => prev.map((s, i) => i === idx ? { ...s, default_cost_price: val } : s));
                                 }}
                                 className="form-input"
@@ -1995,7 +1995,7 @@ function App() {
                                 type="number" 
                                 value={item.default_sell_price}
                                 onChange={(e) => {
-                                  const val = Number(e.target.value);
+                                  const val = e.target.value;
                                   setParsedServices(prev => prev.map((s, i) => i === idx ? { ...s, default_sell_price: val } : s));
                                 }}
                                 className="form-input"
@@ -2007,7 +2007,7 @@ function App() {
                                 type="number" 
                                 value={item.default_commission}
                                 onChange={(e) => {
-                                  const val = Number(e.target.value);
+                                  const val = e.target.value;
                                   setParsedServices(prev => prev.map((s, i) => i === idx ? { ...s, default_commission: val } : s));
                                 }}
                                 className="form-input"
@@ -2093,17 +2093,17 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
     service_name: '',
     account_email: '',
     account_password: '',
-    cost_price: 0,
+    cost_price: '',
     cost_months: 1,
     sold_months: 1,
-    sell_price: 0,
-    amount_paid: 0,
+    sell_price: '',
+    amount_paid: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: '',
     status: 'active',
     notes: '',
     collaborator_id: '',
-    commission_amount: 0,
+    commission_amount: '',
     commission_status: 'none'
   });
 
@@ -2116,17 +2116,17 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
         service_name: data.service_name || '',
         account_email: data.account_email || '',
         account_password: data.account_password || '',
-        cost_price: data.cost_price || 0,
-        cost_months: data.cost_months || 1,
-        sold_months: data.sold_months || 1,
-        sell_price: data.sell_price || 0,
-        amount_paid: data.amount_paid !== undefined ? data.amount_paid : (data.sell_price || 0),
+        cost_price: data.cost_price !== undefined && data.cost_price !== null ? data.cost_price : '',
+        cost_months: data.cost_months !== undefined && data.cost_months !== null ? data.cost_months : '',
+        sold_months: data.sold_months !== undefined && data.sold_months !== null ? data.sold_months : '',
+        sell_price: data.sell_price !== undefined && data.sell_price !== null ? data.sell_price : '',
+        amount_paid: data.amount_paid !== undefined && data.amount_paid !== null ? data.amount_paid : '',
         start_date: data.start_date || new Date().toISOString().split('T')[0],
         end_date: data.end_date || '',
         status: data.status || 'active',
         notes: data.notes || '',
         collaborator_id: data.collaborator_id || '',
-        commission_amount: data.commission_amount || 0,
+        commission_amount: data.commission_amount !== undefined && data.commission_amount !== null ? data.commission_amount : '',
         commission_status: data.commission_status || 'none'
       });
     } else {
@@ -2175,13 +2175,13 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
     setFormData(prev => ({
       ...prev,
       service_name: serviceName,
-      cost_price: defaultCost,
+      cost_price: defaultCost || '',
       cost_months: 1,
       sold_months: 1,
-      sell_price: defaultSell,
-      amount_paid: defaultSell,
+      sell_price: defaultSell || '',
+      amount_paid: defaultSell || '',
       end_date: prev.end_date || calculatedEndDate,
-      commission_amount: prev.collaborator_id ? defaultComm : 0,
+      commission_amount: prev.collaborator_id ? (defaultComm || '') : '',
       commission_status: prev.collaborator_id ? defaultCommStatus : 'none'
     }));
   };
@@ -2195,7 +2195,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
     setFormData(prev => ({
       ...prev,
       collaborator_id: collabId,
-      commission_amount: defaultComm,
+      commission_amount: defaultComm || '',
       commission_status: defaultCommStatus
     }));
   };
@@ -2221,8 +2221,9 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
   };
 
   const costPrice = Number(formData.cost_price || 0);
+  const sellPrice = Number(formData.sell_price || 0);
   const commAmount = formData.collaborator_id ? Number(formData.commission_amount || 0) : 0;
-  const estimatedProfit = formData.sell_price - costPrice - commAmount;
+  const estimatedProfit = sellPrice - costPrice - commAmount;
 
   return (
     <div className="modal-overlay">
@@ -2338,7 +2339,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                     <input 
                       type="number" 
                       value={formData.commission_amount} 
-                      onChange={(e) => setFormData(prev => ({ ...prev, commission_amount: Number(e.target.value) }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, commission_amount: e.target.value }))}
                       className="form-input" 
                       required
                     />
@@ -2364,7 +2365,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                 <input 
                   type="number" 
                   value={formData.cost_price} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, cost_price: Number(e.target.value) }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, cost_price: e.target.value }))}
                   className="form-input" 
                   required
                 />
@@ -2376,7 +2377,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                 <input 
                   type="number" 
                   value={formData.cost_months} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, cost_months: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, cost_months: e.target.value }))}
                   className="form-input" 
                   required
                   min="1"
@@ -2390,12 +2391,15 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                   type="number" 
                   value={formData.sell_price} 
                   onChange={(e) => {
-                    const newSell = Number(e.target.value);
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      sell_price: newSell,
-                      amount_paid: prev.amount_paid === prev.sell_price ? newSell : prev.amount_paid 
-                    }));
+                    const val = e.target.value;
+                    setFormData(prev => {
+                      const shouldUpdatePaid = prev.amount_paid === prev.sell_price;
+                      return { 
+                        ...prev, 
+                        sell_price: val,
+                        amount_paid: shouldUpdatePaid ? val : prev.amount_paid 
+                      };
+                    });
                   }}
                   className="form-input" 
                   required
@@ -2408,7 +2412,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                 <input 
                   type="number" 
                   value={formData.sold_months} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, sold_months: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sold_months: e.target.value }))}
                   className="form-input" 
                   required
                   min="1"
@@ -2429,7 +2433,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                 <input 
                   type="number" 
                   value={formData.amount_paid} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, amount_paid: Number(e.target.value) }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, amount_paid: e.target.value }))}
                   className="form-input" 
                   required
                 />
@@ -2531,9 +2535,9 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
 function ServiceModalForm({ mode, data, onClose, onSave }) {
   const [formData, setFormData] = useState({
     service_name: '',
-    default_cost_price: 0,
-    default_sell_price: 0,
-    default_commission: 0,
+    default_cost_price: '',
+    default_sell_price: '',
+    default_commission: '',
     icon_name: 'box',
     notes: ''
   });
@@ -2542,9 +2546,9 @@ function ServiceModalForm({ mode, data, onClose, onSave }) {
     if (data) {
       setFormData({
         service_name: data.service_name || '',
-        default_cost_price: data.default_cost_price || 0,
-        default_sell_price: data.default_sell_price || 0,
-        default_commission: data.default_commission || 0,
+        default_cost_price: data.default_cost_price !== undefined && data.default_cost_price !== null ? data.default_cost_price : '',
+        default_sell_price: data.default_sell_price !== undefined && data.default_sell_price !== null ? data.default_sell_price : '',
+        default_commission: data.default_commission !== undefined && data.default_commission !== null ? data.default_commission : '',
         icon_name: data.icon_name || 'box',
         notes: data.notes || ''
       });
@@ -2590,7 +2594,7 @@ function ServiceModalForm({ mode, data, onClose, onSave }) {
               <input 
                 type="number" 
                 value={formData.default_cost_price}
-                onChange={(e) => setFormData(prev => ({ ...prev, default_cost_price: Number(e.target.value) }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, default_cost_price: e.target.value }))}
                 className="form-input"
               />
             </div>
@@ -2600,7 +2604,7 @@ function ServiceModalForm({ mode, data, onClose, onSave }) {
               <input 
                 type="number" 
                 value={formData.default_sell_price}
-                onChange={(e) => setFormData(prev => ({ ...prev, default_sell_price: Number(e.target.value) }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, default_sell_price: e.target.value }))}
                 className="form-input"
               />
             </div>
@@ -2610,7 +2614,7 @@ function ServiceModalForm({ mode, data, onClose, onSave }) {
               <input 
                 type="number" 
                 value={formData.default_commission}
-                onChange={(e) => setFormData(prev => ({ ...prev, default_commission: Number(e.target.value) }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, default_commission: e.target.value }))}
                 className="form-input"
               />
             </div>
