@@ -1309,3 +1309,110 @@ a {
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* RENEWAL MODAL STYLES */
+.modal-content.renew-modal {
+  max-width: 680px;
+}
+
+.renew-info-banner {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.renew-info-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.renew-info-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.renew-info-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.renew-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.renew-comparison-box {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.renew-comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.renew-comparison-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.renew-comparison-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-main);
+}
+
+.renew-comparison-table tr:last-child td {
+  border-bottom: none;
+}
+
+.renew-col-old {
+  color: var(--text-muted);
+}
+
+.renew-col-add {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.renew-col-new {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.renew-profit-alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--success-light);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  margin-top: 14px;
+}
+
+

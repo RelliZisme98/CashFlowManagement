@@ -479,26 +479,10 @@ function App() {
   };
 
   const handleOpenRenew = (sub) => {
-    const today = new Date();
-    const futureDate = new Date();
-    const oldEndDate = new Date(sub.end_date);
-    if (oldEndDate > today) {
-      futureDate.setTime(oldEndDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-    } else {
-      futureDate.setDate(today.getDate() + 30);
-    }
-
-    const renewData = {
-      ...sub,
-      start_date: today.toISOString().split('T')[0],
-      end_date: futureDate.toISOString().split('T')[0],
-      status: 'active'
-    };
-
     setSubModal({
       isOpen: true,
       mode: 'renew',
-      data: renewData
+      data: sub
     });
   };
 
@@ -996,24 +980,38 @@ function App() {
                           <div 
                             key={sub.id} 
                             className={`alert-item ${sub.warranty.days < 0 ? 'urgent' : 'soon'}`}
-                            onClick={() => {
-                              setSearchQuery(sub.customer_name);
-                              setActiveTab('subscriptions');
-                            }}
-                            style={{ cursor: 'pointer' }}
-                            title="Bấm để xem và sửa đổi đơn hàng này"
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}
                           >
-                            <div className="alert-icon-box">
-                              <AlertTriangle size={15} />
+                            <div 
+                              style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, cursor: 'pointer', overflow: 'hidden' }}
+                              onClick={() => {
+                                setSearchQuery(sub.customer_name);
+                                setActiveTab('subscriptions');
+                              }}
+                              title="Bấm để lọc khách hàng này trong danh sách"
+                            >
+                              <div className="alert-icon-box">
+                                <AlertTriangle size={15} />
+                              </div>
+                              <div className="alert-content" style={{ overflow: 'hidden' }}>
+                                <div className="alert-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub.customer_name} ({sub.service_name})</div>
+                                <div className="alert-desc">{sub.account_email || 'Chưa cập nhật email'}</div>
+                                <span className="alert-date">
+                                  {sub.warranty.days < 0 ? `Đã quá hạn ${Math.abs(sub.warranty.days)} ngày` : `Hạn chót: ${sub.end_date}`}
+                                </span>
+                              </div>
                             </div>
-                            <div className="alert-content">
-                              <div className="alert-title">{sub.customer_name} ({sub.service_name})</div>
-                              <div className="alert-desc">{sub.account_email || 'Chưa cập nhật email'}</div>
-                              <span className="alert-date">
-                                {sub.warranty.days < 0 ? `Đã quá hạn ${Math.abs(sub.warranty.days)} ngày` : `Hạn chót: ${sub.end_date}`}
-                              </span>
-                            </div>
-                            <ChevronRight size={14} style={{ color: 'var(--text-muted)', alignSelf: 'center' }} />
+                            <button
+                              className="btn btn-primary"
+                              style={{ padding: '5px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenRenew(sub);
+                              }}
+                              title="Gia hạn nhanh đơn hàng này"
+                            >
+                              <RefreshCw size={12} /> Gia hạn
+                            </button>
                           </div>
                         ))
                       )}
@@ -1390,12 +1388,15 @@ function App() {
                                 {/* 9. Hành Động */}
                                 <td>
                                   <div className="actions-cell">
-                                    {isReallyExpired && !isCanceled && (
+                                    {!isCanceled && (
                                       <button 
                                         className="icon-btn" 
-                                        style={{ borderColor: 'var(--warning)', color: 'var(--warning)' }}
+                                        style={{ 
+                                          borderColor: isReallyExpired ? 'var(--warning)' : 'rgba(99, 102, 241, 0.3)', 
+                                          color: isReallyExpired ? 'var(--warning)' : 'var(--primary)' 
+                                        }}
                                         onClick={() => handleOpenRenew(sub)}
-                                        title="Gia hạn nhanh tài khoản này"
+                                        title="Gia hạn (+ Thêm vào dòng tiền)"
                                       >
                                         <RefreshCw size={14} />
                                       </button>
@@ -1852,10 +1853,22 @@ function App() {
 
       {/* --- MODAL DIALOGS --- */}
       
-      {/* 1. Modal Thêm / Sửa / Gia hạn Khách hàng */}
-      {subModal.isOpen && (
+      {/* 1. Modal Thêm / Sửa Khách hàng */}
+      {subModal.isOpen && (subModal.mode === 'add' || subModal.mode === 'edit') && (
         <SubscriptionModalForm 
           mode={subModal.mode}
+          data={subModal.data}
+          services={services}
+          collaborators={collaborators}
+          onClose={() => setSubModal({ isOpen: false, mode: 'add', data: null })}
+          onSave={handleSaveSub}
+          formatVND={formatVND}
+        />
+      )}
+
+      {/* 2. Modal Gia Hạn Gói & Cộng Dồn Dòng Tiền */}
+      {subModal.isOpen && subModal.mode === 'renew' && (
+        <RenewSubscriptionModal 
           data={subModal.data}
           services={services}
           collaborators={collaborators}
@@ -2084,6 +2097,455 @@ function App() {
 }
 
 // ==========================================
+// COMPONENT FORM GIA HẠN GÓI & CỘNG DỒN DÒNG TIỀN (MODAL)
+// ==========================================
+function RenewSubscriptionModal({ data, services, collaborators, onClose, onSave, formatVND }) {
+  if (!data) return null;
+
+  const serviceTemplate = (services || []).find(s => s.service_name === data.service_name);
+  const collabObj = (collaborators || []).find(c => c.id === data.collaborator_id);
+
+  // Đơn giá chuẩn tính theo 1 tháng
+  const defaultUnitPriceSell = serviceTemplate ? Number(serviceTemplate.default_sell_price || 0) : Math.round(Number(data.sell_price || 0) / Math.max(1, Number(data.sold_months || 1)));
+  const defaultUnitPriceCost = serviceTemplate ? Number(serviceTemplate.default_cost_price || 0) : Math.round(Number(data.cost_price || 0) / Math.max(1, Number(data.cost_months || 1)));
+  const defaultUnitPriceComm = (serviceTemplate && data.collaborator_id) 
+    ? Number(serviceTemplate.default_commission || 0) 
+    : (data.collaborator_id && data.commission_amount ? Math.round(Number(data.commission_amount || 0) / Math.max(1, Number(data.sold_months || 1))) : 0);
+
+  // Tính toán ngày kết thúc bảo hành mới (nối tiếp hạn cũ nếu còn hạn, hoặc từ hôm nay nếu đã quá hạn)
+  const calculateNewEndDate = (daysToAdd = 30) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let baseDate;
+    if (data.end_date) {
+      const oldEnd = new Date(data.end_date);
+      oldEnd.setHours(0, 0, 0, 0);
+      if (oldEnd >= today) {
+        baseDate = new Date(oldEnd.getTime());
+      } else {
+        baseDate = new Date(today.getTime());
+      }
+    } else {
+      baseDate = new Date(today.getTime());
+    }
+
+    baseDate.setDate(baseDate.getDate() + daysToAdd);
+    return baseDate.toISOString().split('T')[0];
+  };
+
+  const [renewData, setRenewData] = useState({
+    add_sold_months: 1,
+    add_cost_months: 1,
+    add_sell_price: defaultUnitPriceSell,
+    add_cost_price: defaultUnitPriceCost,
+    add_amount_paid: defaultUnitPriceSell,
+    add_commission_amount: defaultUnitPriceComm,
+    add_commission_status: data.collaborator_id ? 'pending' : 'none',
+    end_date: calculateNewEndDate(30),
+    account_email: data.account_email || '',
+    account_password: data.account_password || '',
+    renew_note: ''
+  });
+
+  // Chọn phím tắt số ngày/tháng nhanh
+  const handleQuickDuration = (days, months) => {
+    const newEnd = calculateNewEndDate(days);
+    const m = months || Math.round(days / 30) || 1;
+    setRenewData(prev => ({
+      ...prev,
+      add_sold_months: m,
+      add_cost_months: m,
+      add_sell_price: defaultUnitPriceSell * m,
+      add_cost_price: defaultUnitPriceCost * m,
+      add_amount_paid: defaultUnitPriceSell * m,
+      add_commission_amount: data.collaborator_id ? defaultUnitPriceComm * m : '',
+      end_date: newEnd
+    }));
+  };
+
+  // Tính toán số liệu Cũ - Thêm - Mới
+  const currentSell = Number(data.sell_price || 0);
+  const currentCost = Number(data.cost_price || 0);
+  const currentPaid = Number(data.amount_paid || 0);
+  const currentSoldMonths = Number(data.sold_months || 1);
+  const currentCostMonths = Number(data.cost_months || 1);
+  const currentComm = data.collaborator_id ? Number(data.commission_amount || 0) : 0;
+
+  const addSell = Number(renewData.add_sell_price || 0);
+  const addCost = Number(renewData.add_cost_price || 0);
+  const addPaid = Number(renewData.add_amount_paid || 0);
+  const addSoldMonths = Number(renewData.add_sold_months || 0);
+  const addCostMonths = Number(renewData.add_cost_months || 0);
+  const addComm = data.collaborator_id ? Number(renewData.add_commission_amount || 0) : 0;
+
+  const newTotalSell = currentSell + addSell;
+  const newTotalCost = currentCost + addCost;
+  const newTotalPaid = currentPaid + addPaid;
+  const newTotalSoldMonths = currentSoldMonths + addSoldMonths;
+  const newTotalCostMonths = currentCostMonths + addCostMonths;
+  const newTotalComm = currentComm + addComm;
+
+  const renewPeriodProfit = addSell - addCost - addComm;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!renewData.end_date) {
+      alert('Vui lòng chọn ngày hết hạn bảo hành mới!');
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const noteSummary = `[Gia hạn ${todayStr}]: +${addSoldMonths} thg (+${formatVND(addSell)})`;
+    const noteDetail = renewData.renew_note?.trim() ? ` - ${renewData.renew_note.trim()}` : '';
+    const newNoteEntry = `${noteSummary}${noteDetail}`;
+
+    const finalNotes = data.notes ? `${data.notes}\n${newNoteEntry}` : newNoteEntry;
+
+    let finalCommStatus = 'none';
+    if (data.collaborator_id) {
+      if (renewData.add_commission_status === 'pending' || data.commission_status === 'pending') {
+        finalCommStatus = 'pending';
+      } else {
+        finalCommStatus = 'paid';
+      }
+    }
+
+    const updatedFormData = {
+      ...data,
+      sell_price: newTotalSell,
+      cost_price: newTotalCost,
+      sold_months: newTotalSoldMonths,
+      cost_months: newTotalCostMonths,
+      amount_paid: newTotalPaid,
+      commission_amount: newTotalComm,
+      commission_status: finalCommStatus,
+      end_date: renewData.end_date,
+      account_email: renewData.account_email !== undefined ? renewData.account_email : data.account_email,
+      account_password: renewData.account_password !== undefined ? renewData.account_password : data.account_password,
+      status: 'active',
+      notes: finalNotes
+    };
+
+    onSave(updatedFormData);
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content renew-modal">
+        <div className="modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <RefreshCw size={18} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '17px' }}>Gia Hạn Gói Dịch Vụ (+ Thêm Dòng Tiền)</h3>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Cộng dồn doanh thu, thời hạn và dòng tiền vào đơn hàng</span>
+            </div>
+          </div>
+          <button className="icon-btn" onClick={onClose} style={{ border: 'none', fontSize: '18px' }}>×</button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
+            
+            {/* Banner tóm tắt khách hàng & dịch vụ hiện tại */}
+            <div className="renew-info-banner">
+              <div className="renew-info-main">
+                <div className="renew-info-title">
+                  <span>{data.customer_name}</span>
+                  {data.customer_phone && <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({data.customer_phone})</span>}
+                  {collabObj && <span className="collab-tag"><Users size={9} /> {collabObj.name}</span>}
+                </div>
+                <div className="renew-info-meta">
+                  Gói: <strong style={{ color: 'var(--primary)' }}>{data.service_name}</strong> • Hạn bảo hành hiện tại: <strong style={{ color: 'var(--warning)' }}>{data.end_date}</strong>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <span className="badge active" style={{ fontSize: '11px' }}>Đã bán: {currentSoldMonths} thg</span>
+                <span className="badge info" style={{ fontSize: '11px' }}>Gốc: {currentCostMonths} thg</span>
+              </div>
+            </div>
+
+            <div className="renew-section-title">
+              <Sparkles size={16} style={{ color: 'var(--primary)' }} />
+              <span>Thông Tin Gia Hạn Thêm (+) Đợt Này</span>
+            </div>
+
+            {/* Phím tắt điền thời hạn nhanh */}
+            <div className="form-group full-width" style={{ marginBottom: '12px' }}>
+              <span className="form-label" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Chọn thời hạn gia hạn nhanh:</span>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                <button type="button" className={`btn ${renewData.add_sold_months === 1 ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleQuickDuration(30, 1)}>+1 Tháng (30 ngày)</button>
+                <button type="button" className={`btn ${renewData.add_sold_months === 3 ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleQuickDuration(90, 3)}>+3 Tháng (90 ngày)</button>
+                <button type="button" className={`btn ${renewData.add_sold_months === 6 ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleQuickDuration(180, 6)}>+6 Tháng (180 ngày)</button>
+                <button type="button" className={`btn ${renewData.add_sold_months === 12 ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleQuickDuration(365, 12)}>+1 Năm (365 ngày)</button>
+              </div>
+            </div>
+
+            <div className="form-grid">
+              {/* Số tháng bán gia hạn thêm */}
+              <div className="form-group">
+                <label className="form-label">Số Tháng Bán Gia Hạn (+) *</label>
+                <input 
+                  type="number" 
+                  value={renewData.add_sold_months} 
+                  onChange={(e) => {
+                    const val = Math.max(1, Number(e.target.value) || 1);
+                    setRenewData(prev => ({ 
+                      ...prev, 
+                      add_sold_months: val,
+                      add_sell_price: defaultUnitPriceSell * val,
+                      add_amount_paid: defaultUnitPriceSell * val
+                    }));
+                  }}
+                  className="form-input" 
+                  min="1"
+                  required
+                />
+              </div>
+
+              {/* Ngày hết hạn bảo hành mới */}
+              <div className="form-group">
+                <label className="form-label">Hạn Bảo Hành Mới Sau Gia Hạn *</label>
+                <input 
+                  type="date" 
+                  value={renewData.end_date} 
+                  onChange={(e) => setRenewData(prev => ({ ...prev, end_date: e.target.value }))}
+                  className="form-input" 
+                  required
+                />
+              </div>
+
+              {/* Giá bán gia hạn thêm */}
+              <div className="form-group">
+                <label className="form-label">Giá Bán Gia Hạn Đợt Này (VND) *</label>
+                <input 
+                  type="number" 
+                  value={renewData.add_sell_price} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRenewData(prev => {
+                      const shouldSyncPaid = prev.add_amount_paid === prev.add_sell_price;
+                      return {
+                        ...prev,
+                        add_sell_price: val,
+                        add_amount_paid: shouldSyncPaid ? val : prev.add_amount_paid
+                      };
+                    });
+                  }}
+                  className="form-input" 
+                  required
+                />
+              </div>
+
+              {/* Khách trả đợt này */}
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                  Khách Đã Trả Đợt Này (VND) *
+                  <span 
+                    style={{ fontSize: '11px', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
+                    onClick={() => setRenewData(prev => ({ ...prev, add_amount_paid: prev.add_sell_price }))}
+                  >
+                    [Thu Đủ]
+                  </span>
+                </label>
+                <input 
+                  type="number" 
+                  value={renewData.add_amount_paid} 
+                  onChange={(e) => setRenewData(prev => ({ ...prev, add_amount_paid: e.target.value }))}
+                  className="form-input" 
+                  required
+                />
+              </div>
+
+              {/* Số tháng mua gốc thêm */}
+              <div className="form-group">
+                <label className="form-label">Số Tháng Mua Thêm Gói Gốc (+)</label>
+                <input 
+                  type="number" 
+                  value={renewData.add_cost_months} 
+                  onChange={(e) => {
+                    const val = Number(e.target.value) || 0;
+                    setRenewData(prev => ({ 
+                      ...prev, 
+                      add_cost_months: val,
+                      add_cost_price: defaultUnitPriceCost * val
+                    }));
+                  }}
+                  className="form-input" 
+                  min="0"
+                  placeholder="0 nếu còn dư gói gốc"
+                />
+              </div>
+
+              {/* Giá vốn gốc thêm */}
+              <div className="form-group">
+                <label className="form-label">Giá Vốn Mua Thêm Đợt Này (VND)</label>
+                <input 
+                  type="number" 
+                  value={renewData.add_cost_price} 
+                  onChange={(e) => setRenewData(prev => ({ ...prev, add_cost_price: e.target.value }))}
+                  className="form-input" 
+                  placeholder="0 nếu không phát sinh chi phí gốc"
+                />
+              </div>
+
+              {/* Hoa hồng CTV (nếu có) */}
+              {data.collaborator_id && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Hoa Hồng CTV Đợt Này (VND)</label>
+                    <input 
+                      type="number" 
+                      value={renewData.add_commission_amount} 
+                      onChange={(e) => setRenewData(prev => ({ ...prev, add_commission_amount: e.target.value }))}
+                      className="form-input" 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Thanh Toán Hoa Hồng Đợt Này</label>
+                    <select 
+                      value={renewData.add_commission_status} 
+                      onChange={(e) => setRenewData(prev => ({ ...prev, add_commission_status: e.target.value }))}
+                      className="form-input"
+                    >
+                      <option value="pending">Chưa thanh toán (Ghi nợ)</option>
+                      <option value="paid">Đã thanh toán xong</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {/* Email đăng nhập bàn giao */}
+              <div className="form-group">
+                <label className="form-label">Email Đăng Nhập Tài Khoản</label>
+                <input 
+                  type="email" 
+                  value={renewData.account_email} 
+                  onChange={(e) => setRenewData(prev => ({ ...prev, account_email: e.target.value }))}
+                  className="form-input" 
+                  placeholder="email@account.com"
+                />
+              </div>
+
+              {/* Mật khẩu */}
+              <div className="form-group">
+                <label className="form-label">Mật Khẩu Tài Khoản</label>
+                <input 
+                  type="text" 
+                  value={renewData.account_password} 
+                  onChange={(e) => setRenewData(prev => ({ ...prev, account_password: e.target.value }))}
+                  className="form-input" 
+                  placeholder="Mật khẩu bàn giao"
+                />
+              </div>
+
+              {/* Ghi chú đợt gia hạn */}
+              <div className="form-group full-width">
+                <label className="form-label">Ghi Chú Đợt Gia Hạn Này</label>
+                <input 
+                  type="text" 
+                  value={renewData.renew_note} 
+                  onChange={(e) => setRenewData(prev => ({ ...prev, renew_note: e.target.value }))}
+                  className="form-input" 
+                  placeholder="Ví dụ: Khách CK Techcombank, gia hạn slot 2..."
+                />
+              </div>
+            </div>
+
+            {/* BẢNG SO SÁNH DÒNG TIỀN VÀ SỐ LIỆU TỔNG HỢP (LIVE COMPARISON) */}
+            <div className="renew-comparison-box">
+              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Layers size={15} style={{ color: 'var(--primary)' }} />
+                <span>Bảng Đối Chiếu Dòng Tiền (+ Cộng Thêm Vào)</span>
+              </div>
+              <div className="table-responsive">
+                <table className="renew-comparison-table">
+                  <thead>
+                    <tr>
+                      <th>Chỉ Số Tài Chính</th>
+                      <th>Đã Ghi Nhận</th>
+                      <th>Gia Hạn Thêm (+)</th>
+                      <th>Tổng Mới Sau Gia Hạn</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Doanh thu bán</strong></td>
+                      <td className="renew-col-old">{formatVND(currentSell)}</td>
+                      <td className="renew-col-add">+{formatVND(addSell)}</td>
+                      <td className="renew-col-new">{formatVND(newTotalSell)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Vốn mua gốc</strong></td>
+                      <td className="renew-col-old">{formatVND(currentCost)}</td>
+                      <td className="renew-col-add">+{formatVND(addCost)}</td>
+                      <td className="renew-col-new">{formatVND(newTotalCost)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Khách đã trả</strong></td>
+                      <td className="renew-col-old">{formatVND(currentPaid)}</td>
+                      <td className="renew-col-add">+{formatVND(addPaid)}</td>
+                      <td className="renew-col-new">{formatVND(newTotalPaid)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Số tháng đã bán</strong></td>
+                      <td className="renew-col-old">{currentSoldMonths} tháng</td>
+                      <td className="renew-col-add">+{addSoldMonths} tháng</td>
+                      <td className="renew-col-new">{newTotalSoldMonths} tháng</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Số tháng gói gốc</strong></td>
+                      <td className="renew-col-old">{currentCostMonths} tháng</td>
+                      <td className="renew-col-add">+{addCostMonths} tháng</td>
+                      <td className="renew-col-new">{newTotalCostMonths} tháng</td>
+                    </tr>
+                    {data.collaborator_id && (
+                      <tr>
+                        <td><strong>Hoa hồng CTV</strong></td>
+                        <td className="renew-col-old">{formatVND(currentComm)}</td>
+                        <td className="renew-col-add">+{formatVND(addComm)}</td>
+                        <td className="renew-col-new">{formatVND(newTotalComm)}</td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td><strong>Hạn bảo hành</strong></td>
+                      <td className="renew-col-old">{data.end_date}</td>
+                      <td className="renew-col-add">➔</td>
+                      <td className="renew-col-new" style={{ color: 'var(--success)' }}>{renewData.end_date}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Lãi ròng đợt gia hạn này */}
+              <div className="renew-profit-alert">
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Lãi ròng thu về từ đợt gia hạn này:
+                </span>
+                <span style={{ fontSize: '16px', fontWeight: 800, color: renewPeriodProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  +{formatVND(renewPeriodProfit)}
+                </span>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Hủy Bỏ</button>
+            <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <RefreshCw size={14} /> Xác Nhận Gia Hạn (+ Thêm Vào Dòng Tiền)
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
 // COMPONENT FORM CHI TIẾT KHÁCH HÀNG (MODAL)
 // ==========================================
 function SubscriptionModalForm({ mode, data, services, collaborators, onClose, onSave, formatVND }) {
@@ -2107,7 +2569,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
     commission_status: 'none'
   });
 
-  // Tự động gán dữ liệu nếu chế độ là Sửa hoặc Gia hạn
+  // Tự động gán dữ liệu nếu chế độ là Sửa
   useEffect(() => {
     if (data) {
       setFormData({
@@ -2230,9 +2692,7 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
       <div className="modal-content">
         <div className="modal-header">
           <h3>
-            {mode === 'add' && 'Thêm Đơn Hàng Khách Hàng Mới'}
-            {mode === 'edit' && 'Cập Nhật Thông Tin Khách Hàng'}
-            {mode === 'renew' && `Gia Hạn Gói Cho: ${formData.customer_name}`}
+            {mode === 'add' ? 'Thêm Đơn Hàng Khách Hàng Mới' : 'Cập Nhật Thông Tin Khách Hàng'}
           </h3>
           <button className="icon-btn" onClick={onClose} style={{ border: 'none', fontSize: '18px' }}>×</button>
         </div>
@@ -2251,7 +2711,6 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                   className="form-input" 
                   placeholder="Ví dụ: Nguyễn Văn A"
                   required
-                  disabled={mode === 'renew'}
                 />
               </div>
 
@@ -2264,7 +2723,6 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
                   onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
                   className="form-input" 
                   placeholder="Ví dụ: 0912345678"
-                  disabled={mode === 'renew'}
                 />
               </div>
 
@@ -2272,11 +2730,10 @@ function SubscriptionModalForm({ mode, data, services, collaborators, onClose, o
               <div className="form-group">
                 <label className="form-label">Gói Dịch Vụ Premium *</label>
                 <select 
-                  value={formData.service_name}
+                  value={formData.service_name} 
                   onChange={handleServiceChange}
-                  className="form-input"
+                  className="form-input" 
                   required
-                  disabled={mode === 'renew'}
                 >
                   <option value="" disabled>-- Chọn gói dịch vụ --</option>
                   {Object.entries(groupedServices).map(([groupName, groupList]) => (
